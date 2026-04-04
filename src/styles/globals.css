@@ -157,3 +157,28 @@
     @apply bg-background text-foreground font-sans overscroll-none;
   }
 }
+
+/* Inline metric loading — shimmer sweep (used with .value-shimmer) */
+@layer utilities {
+  .value-shimmer {
+    background: linear-gradient(
+      90deg,
+      hsl(var(--muted)) 0%,
+      hsl(var(--muted)) 35%,
+      hsl(var(--accent)) 50%,
+      hsl(var(--muted)) 65%,
+      hsl(var(--muted)) 100%
+    );
+    background-size: 200% 100%;
+    animation: value-shimmer-move 1.15s ease-in-out infinite;
+  }
+
+  @keyframes value-shimmer-move {
+    0% {
+      background-position: 100% 0;
+    }
+    100% {
+      background-position: -100% 0;
+    }
+  }
+}

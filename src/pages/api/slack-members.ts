@@ -18,7 +18,11 @@ export default async function handler(
   }
   try {
     // :fire: Simple query – no ORDER BY, no column assumptions
-    const { rows } = await pool.query("SELECT * FROM slack_members");
+    const { rows } = await pool.query(
+      `SELECT slack_user_id, slack_team_id, email, requester_id, safserv_active,
+              created_at, updated_at, atlas_last_sync
+       FROM public.users`
+    );
     return res.status(200).json({
       success: true,
       data: rows,
