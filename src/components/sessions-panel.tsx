@@ -1,0 +1,434 @@
+"use client";
+
+import * as React from "react";
+import { formatDistanceToNow } from "date-fns";
+import {
+  ArrowDownAZ,
+  Clock3,
+  Eye,
+  KeyRound,
+  RefreshCw,
+  Search,
+} from "lucide-react";
+
+import { PageHeading } from "@/components/page-heading";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { cn } from "@/lib/utils";
+
+type SessionValue = Record<string, unknown> | null;
+
+type SessionRow = {
+  namespace: string;
+  teamId: string;
+  userId: string;
+  key: string;
+  ttlSeconds: number | null;
+  value: SessionValue;
+};
+
+type SessionsTreeResponse = {
+  success: true;
+  data: {
+    total: number;
+    returned: number;
+    limit: number;
+    sessions: Record<string, Record<string, Record<string, {
+      key: string;
+      ttlSeconds: number | null;
+      value: SessionValue;
+    }>>>;
+  };
+};
+
+type SessionsCountResponse = {
+  success: true;
+  data: { total: number };
+};
+
+type SortKey = "ttl_desc" | "ttl_asc" | "team_asc" | "team_desc";
+type Tri = "any" | "yes" | "no";
+
+const PAGE_SIZE = 30;
+
+function flattenTree(tree: SessionsTreeResponse["data"]["sessions"]): SessionRow[] {
+  const rows: SessionRow[] = [];
+  for (const [namespace, teams] of Object.entries(tree ?? {})) {
+    for (const [teamId, users] of Object.entries(teams ?? {})) {
+      for (const [userId, entry] of Object.entries(users ?? {})) {
+        rows.push({
+          namespace,
+          teamId,
+          userId,
+          key: entry.key,
+          ttlSeconds: typeof entry.ttlSeconds === "number" ? entry.ttlSeconds : null,
+          value:
+            entry.value && typeof entry.value === "object"
+              ? (entry.value as Record<string, unknown>)
+              : null,
+        });
+      }
+    }
+  }
+  return rows;
+}
+
+function hasAppToken(value: SessionValue): boolean {
+  if (!value) return false;
+  return Boolean(value.token || value.digiSpaceAccessToken);
+}
+
+function expiresText(ttlSeconds: number | null): string {
+  if (ttlSeconds === null || ttlSeconds < 0) return "No TTL";
+  const date = new Date(Date.now() + ttlSeconds * 1000);
+  return formatDistanceToNow(date, { addSuffix: true });
+}
+
+export function SessionsPanel() {
+  const [allRows, setAllRows] = React.useState<SessionRow[]>([]);
+  const [total, setTotal] = React.useState<number>(0);
+  const [returned, setReturned] = React.useState<number>(0);
+  const [loading, setLoading] = React.useState<boolean>(true);
+  const [refreshing, setRefreshing] = React.useState<boolean>(false);
+
+  const [q, setQ] = React.useState<string>("");
+  const [qDebounced, setQDebounced] = React.useState<string>("");
+  const [teamIdFilter, setTeamIdFilter] = React.useState<string>("");
+  const [userIdFilter, setUserIdFilter] = React.useState<string>("");
+  const [hasToken, setHasToken] = React.useState<Tri>("any");
+  const [sort, setSort] = React.useState<SortKey>("ttl_desc");
+  const [page, setPage] = React.useState(0);
+
+  const [sheetOpen, setSheetOpen] = React.useState(false);
+  const [selected, setSelected] = React.useState<SessionRow | null>(null);
+
+  React.useEffect(() => {
+    const t = window.setTimeout(() => setQDebounced(q), 350);
+    return () => window.clearTimeout(t);
+  }, [q]);
+
+  const fetchData = React.useCallback(async (isRefresh = false) => {
+    if (isRefresh) setRefreshing(true);
+    else setLoading(true);
+    try {
+      const [treeRes, countRes] = await Promise.all([
+        fetch("/api/sessions/tree?limit=500"),
+        fetch("/api/sessions/count"),
+      ]);
+      const treeJson = (await treeRes.json()) as SessionsTreeResponse;
+      const countJson = (await countRes.json()) as SessionsCountResponse;
+      if (!treeRes.ok || !treeJson.success) throw new Error("Failed to load sessions");
+      if (!countRes.ok || !countJson.success) throw new Error("Failed to load sessions count");
+
+      const rows = flattenTree(treeJson.data.sessions);
+      setAllRows(rows);
+      setReturned(treeJson.data.returned ?? rows.length);
+      setTotal(countJson.data.total ?? treeJson.data.total ?? rows.length);
+    } catch {
+      setAllRows([]);
+      setReturned(0);
+      setTotal(0);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    void fetchData(false);
+  }, [fetchData]);
+
+  const filtered = React.useMemo(() => {
+    const qNorm = qDebounced.trim().toLowerCase();
+    let rows = allRows.filter((r) => {
+      if (teamIdFilter.trim() && !r.teamId.toLowerCase().includes(teamIdFilter.trim().toLowerCase())) {
+        return false;
+      }
+      if (userIdFilter.trim() && !r.userId.toLowerCase().includes(userIdFilter.trim().toLowerCase())) {
+        return false;
+      }
+      if (hasToken === "yes" && !hasAppToken(r.value)) return false;
+      if (hasToken === "no" && hasAppToken(r.value)) return false;
+      if (!qNorm) return true;
+      const email = typeof r.value?.email === "string" ? r.value.email : "";
+      return (
+        r.teamId.toLowerCase().includes(qNorm) ||
+        r.userId.toLowerCase().includes(qNorm) ||
+        r.key.toLowerCase().includes(qNorm) ||
+        email.toLowerCase().includes(qNorm)
+      );
+    });
+
+    rows = [...rows].sort((a, b) => {
+      if (sort === "ttl_desc") return (b.ttlSeconds ?? -1) - (a.ttlSeconds ?? -1);
+      if (sort === "ttl_asc") return (a.ttlSeconds ?? 10 ** 9) - (b.ttlSeconds ?? 10 ** 9);
+      if (sort === "team_desc") return b.teamId.localeCompare(a.teamId);
+      return a.teamId.localeCompare(b.teamId);
+    });
+    return rows;
+  }, [allRows, qDebounced, teamIdFilter, userIdFilter, hasToken, sort]);
+
+  React.useEffect(() => {
+    setPage(0);
+  }, [qDebounced, teamIdFilter, userIdFilter, hasToken, sort]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const pageRows = filtered.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE);
+  const start = filtered.length === 0 ? 0 : page * PAGE_SIZE + 1;
+  const end = Math.min((page + 1) * PAGE_SIZE, filtered.length);
+
+  return (
+    <div className="space-y-6">
+      <PageHeading
+        icon={KeyRound}
+        title="Sessions"
+        description="Live sessions from Redis, grouped and filtered like People."
+      />
+
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="rounded-xl border border-border/60 bg-muted/25 px-3 py-1.5 text-xs text-muted-foreground">
+          Total in Redis: <span className="font-semibold text-foreground">{total}</span>
+        </div>
+        <div className="rounded-xl border border-border/60 bg-muted/25 px-3 py-1.5 text-xs text-muted-foreground">
+          Loaded: <span className="font-semibold text-foreground">{returned}</span> (limit 500)
+        </div>
+        <div className="ml-auto flex gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="rounded-lg"
+            onClick={() => void fetchData(true)}
+            disabled={loading || refreshing}
+          >
+            <RefreshCw className={cn("mr-1.5 size-3.5", refreshing && "animate-spin")} />
+            Refresh
+          </Button>
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-border/60 bg-card/40 p-4 shadow-sm">
+        <div className="grid gap-3 lg:grid-cols-5">
+          <div className="relative lg:col-span-2">
+            <Search className="text-muted-foreground absolute left-3 top-1/2 size-4 -translate-y-1/2" />
+            <Input
+              placeholder="Search team, user, email, key…"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              className="h-10 rounded-xl border-border/60 pl-9"
+            />
+          </div>
+          <Input
+            placeholder="Team ID"
+            value={teamIdFilter}
+            onChange={(e) => setTeamIdFilter(e.target.value)}
+            className="h-10 rounded-xl border-border/60 font-mono text-sm"
+          />
+          <Input
+            placeholder="User ID"
+            value={userIdFilter}
+            onChange={(e) => setUserIdFilter(e.target.value)}
+            className="h-10 rounded-xl border-border/60 font-mono text-sm"
+          />
+          <div className="flex gap-2">
+            <Select value={hasToken} onValueChange={(v) => setHasToken(v as Tri)}>
+              <SelectTrigger className="h-10 w-[140px] rounded-xl">
+                <SelectValue placeholder="Token" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="any">Any token</SelectItem>
+                <SelectItem value="yes">Has token</SelectItem>
+                <SelectItem value="no">No token</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={sort} onValueChange={(v) => setSort(v as SortKey)}>
+              <SelectTrigger className="h-10 w-[190px] rounded-xl">
+                <ArrowDownAZ className="mr-1 size-3.5 opacity-60" />
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ttl_desc">TTL · highest</SelectItem>
+                <SelectItem value="ttl_asc">TTL · lowest</SelectItem>
+                <SelectItem value="team_asc">Team · A-Z</SelectItem>
+                <SelectItem value="team_desc">Team · Z-A</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      </div>
+
+      <div className="relative overflow-hidden rounded-2xl border border-border/60 bg-card/40 shadow-sm">
+        <div className="text-muted-foreground relative flex flex-wrap items-center justify-between gap-2 border-b px-4 py-3 text-xs">
+          <span>
+            Showing{" "}
+            <span className="text-foreground font-medium">
+              {loading ? "…" : filtered.length === 0 ? "0" : `${start}–${end}`}
+            </span>{" "}
+            of <span className="text-foreground font-medium">{loading ? "…" : filtered.length}</span>{" "}
+            loaded sessions
+          </span>
+          <span>Page {page + 1} / {totalPages}</span>
+        </div>
+        <div className="relative px-2 pb-2 pt-2 sm:px-3">
+          <ScrollArea className="h-[min(70vh,720px)] w-full rounded-xl border border-muted-foreground/15 bg-card/50">
+            <Table>
+              <TableHeader>
+                <TableRow className="border-muted-foreground/15 hover:bg-transparent">
+                  <TableHead className="min-w-[150px] font-semibold">Team</TableHead>
+                  <TableHead className="min-w-[160px] font-semibold">User</TableHead>
+                  <TableHead className="min-w-[300px] font-semibold">Email</TableHead>
+                  <TableHead className="min-w-[130px] font-semibold">Token</TableHead>
+                  <TableHead className="min-w-[160px] font-semibold">TTL</TableHead>
+                  <TableHead className="min-w-[320px] font-semibold">Key</TableHead>
+                  <TableHead className="w-[100px] text-right font-semibold">Action</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {loading ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="h-40 text-center text-muted-foreground">
+                      Loading sessions…
+                    </TableCell>
+                  </TableRow>
+                ) : pageRows.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="h-40 text-center text-muted-foreground">
+                      No sessions match these filters.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  pageRows.map((row) => {
+                    const email = typeof row.value?.email === "string" ? row.value.email : "—";
+                    const token = hasAppToken(row.value);
+                    return (
+                      <TableRow key={row.key} className="border-muted-foreground/10 hover:bg-muted/40">
+                        <TableCell>
+                          <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">{row.teamId}</code>
+                        </TableCell>
+                        <TableCell>
+                          <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">{row.userId}</code>
+                        </TableCell>
+                        <TableCell className="max-w-[320px] truncate">{email}</TableCell>
+                        <TableCell>
+                          {token ? <Badge>Yes</Badge> : <Badge variant="secondary">No</Badge>}
+                        </TableCell>
+                        <TableCell>
+                          <span className="inline-flex items-center gap-1 text-sm text-muted-foreground">
+                            <Clock3 className="size-3.5" />
+                            {expiresText(row.ttlSeconds)}
+                          </span>
+                        </TableCell>
+                        <TableCell className="max-w-[360px]">
+                          <code className="truncate rounded bg-muted px-1.5 py-0.5 font-mono text-xs">
+                            {row.key}
+                          </code>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="rounded-lg"
+                            onClick={() => {
+                              setSelected(row);
+                              setSheetOpen(true);
+                            }}
+                          >
+                            <Eye className="mr-1 size-3.5" />
+                            View
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
+                )}
+              </TableBody>
+            </Table>
+            <ScrollBar orientation="horizontal" />
+          </ScrollArea>
+        </div>
+        <div className="flex items-center justify-end gap-2 border-t bg-muted/20 px-4 py-3">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="rounded-lg"
+            disabled={loading || page <= 0}
+            onClick={() => setPage((p) => Math.max(0, p - 1))}
+          >
+            Previous
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="rounded-lg"
+            disabled={loading || (page + 1) * PAGE_SIZE >= filtered.length}
+            onClick={() => setPage((p) => p + 1)}
+          >
+            Next
+          </Button>
+        </div>
+      </div>
+
+      <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+        <SheetContent
+          side="right"
+          className="flex w-full flex-col gap-4 overflow-y-auto border-l bg-background/95 p-0 sm:max-w-xl"
+        >
+          <SheetHeader className="border-b px-6 py-5 text-left">
+            <SheetTitle>Session detail</SheetTitle>
+            <SheetDescription>
+              {selected ? (
+                <code className="rounded bg-muted px-1.5 py-0.5 text-[11px]">{selected.key}</code>
+              ) : (
+                "Select a session"
+              )}
+            </SheetDescription>
+          </SheetHeader>
+          {selected ? (
+            <div className="space-y-4 px-6 pb-6">
+              <div className="rounded-xl border bg-card p-4">
+                <p className="text-sm"><span className="text-muted-foreground">Namespace:</span> {selected.namespace}</p>
+                <p className="text-sm"><span className="text-muted-foreground">Team:</span> <code>{selected.teamId}</code></p>
+                <p className="text-sm"><span className="text-muted-foreground">User:</span> <code>{selected.userId}</code></p>
+                <p className="text-sm"><span className="text-muted-foreground">TTL:</span> {expiresText(selected.ttlSeconds)}</p>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground">Payload JSON</Label>
+                <pre className="overflow-auto rounded-xl border bg-muted/20 p-3 text-xs leading-relaxed">
+                  {JSON.stringify(selected.value ?? {}, null, 2)}
+                </pre>
+              </div>
+            </div>
+          ) : null}
+        </SheetContent>
+      </Sheet>
+    </div>
+  );
+}

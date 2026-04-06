@@ -6,6 +6,7 @@ import {
   Layers,
   LogOut,
   PieChart,
+  KeyRound,
   Users,
 } from "lucide-react";
 
@@ -14,7 +15,7 @@ import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import { ModeToggle } from "@/components/ModeToggle";
 
-export type DashboardNavId = "Dashboard" | "People" | "Jobs";
+export type DashboardNavId = "Dashboard" | "People" | "Jobs" | "Sessions";
 
 const NAV: {
   id: DashboardNavId;
@@ -24,6 +25,7 @@ const NAV: {
   { id: "Dashboard", label: "Overview", icon: PieChart },
   { id: "People", label: "People", icon: Users },
   { id: "Jobs", label: "Jobs", icon: Layers },
+  { id: "Sessions", label: "Sessions", icon: KeyRound },
 ];
 
 type DashboardShellProps = {

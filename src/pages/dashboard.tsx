@@ -10,6 +10,7 @@ import {
 import { OperationsDashboard } from "@/components/operations-dashboard";
 import { ProductTable } from "@/components/people-table";
 import { JobsPanel } from "@/components/jobs-panel";
+import { SessionsPanel } from "@/components/sessions-panel";
 
 function parseTab(
   tab: string | string[] | undefined
@@ -17,6 +18,7 @@ function parseTab(
   const v = Array.isArray(tab) ? tab[0] : tab;
   if (v === "people") return "People";
   if (v === "jobs") return "Jobs";
+  if (v === "sessions") return "Sessions";
   return "Dashboard";
 }
 
@@ -41,7 +43,8 @@ export default function Page() {
       if (id === "Dashboard") {
         void router.replace("/dashboard", undefined, { shallow: true });
       } else {
-        const tab = id === "People" ? "people" : "jobs";
+        const tab =
+          id === "People" ? "people" : id === "Jobs" ? "jobs" : "sessions";
         void router.replace(`/dashboard?tab=${tab}`, undefined, { shallow: true });
       }
     },
@@ -65,8 +68,10 @@ export default function Page() {
         <OperationsDashboard />
       ) : activePage === "People" ? (
         <ProductTable />
-      ) : (
+      ) : activePage === "Jobs" ? (
         <JobsPanel />
+      ) : (
+        <SessionsPanel />
       )}
     </DashboardShell>
   );

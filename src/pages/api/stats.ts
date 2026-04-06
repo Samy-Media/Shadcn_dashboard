@@ -13,6 +13,21 @@ export default async function handler(
   }
   try {
     const data = await getDashboardStats();
+
+    const redisBase = process.env.REDIS_API_BASE_URL?.trim() || "http://localhost:3030";
+    try {
+      const sessionsRes = await fetch(`${redisBase}/sessions/count`);
+      if (sessionsRes.ok) {
+        const json = await sessionsRes.json();
+        data.activeSessions = Number(json?.total ?? 0);
+      } else {
+        data.activeSessions = 0;
+      }
+    } catch {
+      // Keep dashboard stats available even if Redis API is down.
+      data.activeSessions = 0;
+    }
+
     return res.status(200).json({ success: true, data });
   } catch (error) {
     console.error("stats fetch error:", error);

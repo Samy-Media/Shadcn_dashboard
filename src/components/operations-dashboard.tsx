@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import {
+  KeyRound,
   Building2,
   CheckCircle2,
   Layers3,
@@ -31,6 +32,7 @@ import { ValueShimmer } from "@/components/value-shimmer";
 type StatsPayload = {
   usersOnboarded: number;
   slackInstallations: number;
+  activeSessions: number;
   jobs: {
     total: number;
     queued: number;
@@ -112,7 +114,7 @@ export function OperationsDashboard() {
         <PageHeading
           icon={PieChart}
           title="Operations overview"
-          description="Live counts from Postgres: onboarded users, Slack workspaces, and job pipeline health."
+          description="Live counts from Postgres and Redis: users, workspaces, active sessions, and job pipeline health."
         />
         <Card className="border-destructive/50">
           <CardHeader>
@@ -131,11 +133,11 @@ export function OperationsDashboard() {
       <PageHeading
         icon={PieChart}
         title="Operations overview"
-        description="Live counts from Postgres: onboarded users, Slack workspaces, and job pipeline health."
+        description="Live counts from Postgres and Redis: users, workspaces, active sessions, and job pipeline health."
       />
 
       {/* KPI row — horizontal band */}
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-5 md:gap-4">
         <Card className="@container/card border-border/60 shadow-sm">
           <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
             <CardDescription>Users onboarded</CardDescription>
@@ -190,6 +192,25 @@ export function OperationsDashboard() {
             </div>
             <p className="text-muted-foreground mt-2 text-xs">
               Statuses: completed, success, succeeded
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="@container/card border-border/60 shadow-sm">
+          <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
+            <CardDescription>Active sessions</CardDescription>
+            <KeyRound className="text-muted-foreground size-4" aria-hidden />
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-semibold tabular-nums">
+              {loading ? (
+                <ValueShimmer className="h-9 w-[3ch] min-w-[3rem]" />
+              ) : (
+                s?.activeSessions ?? "—"
+              )}
+            </div>
+            <p className="text-muted-foreground mt-2 text-xs">
+              Live count from <code className="text-[0.8rem]">/sessions/count</code>
             </p>
           </CardContent>
         </Card>

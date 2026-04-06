@@ -41,6 +41,7 @@ export type SlackInstallationRow = {
 export type DashboardStats = {
   usersOnboarded: number;
   slackInstallations: number;
+  activeSessions: number;
   jobs: {
     total: number;
     queued: number;
@@ -472,6 +473,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
   return {
     usersOnboarded: Number(usersRes.rows[0]?.c ?? 0),
     slackInstallations: Number(installsRes.rows[0]?.c ?? 0),
+    activeSessions: 0,
     jobs: {
       total: Number(jobs?.total ?? 0),
       queued: Number(jobs?.queued ?? 0),
