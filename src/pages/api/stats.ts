@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { getDashboardStats } from "@/lib/operations-queries";
+import { countSessions } from "@/lib/redis-sessions";
 
 type Ok = { success: true; data: Awaited<ReturnType<typeof getDashboardStats>> };
 type Err = { success: false; message: string };
@@ -14,17 +15,10 @@ export default async function handler(
   try {
     const data = await getDashboardStats();
 
-    const redisBase = process.env.REDIS_API_BASE_URL?.trim() || "http://localhost:3030";
     try {
-      const sessionsRes = await fetch(`${redisBase}/sessions/count`);
-      if (sessionsRes.ok) {
-        const json = await sessionsRes.json();
-        data.activeSessions = Number(json?.total ?? 0);
-      } else {
-        data.activeSessions = 0;
-      }
+      data.activeSessions = await countSessions("session:*");
     } catch {
-      // Keep dashboard stats available even if Redis API is down.
+      // Keep dashboard stats available even if Redis is unavailable.
       data.activeSessions = 0;
     }
 

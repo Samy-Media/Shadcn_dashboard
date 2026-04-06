@@ -1,4 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from "next";
+import { countSessions } from "@/lib/redis-sessions";
 
 type Ok = {
   success: true;
@@ -14,20 +15,10 @@ export default async function handler(
     return res.status(405).json({ success: false, message: "Method not allowed" });
   }
   try {
-    const base = process.env.REDIS_API_BASE_URL?.trim() || "http://localhost:3030";
-    const response = await fetch(`${base}/sessions/count`);
-    const json = await response.json();
-
-    if (!response.ok) {
-      return res.status(502).json({
-        success: false,
-        message: json?.error ?? "Failed to fetch sessions count",
-      });
-    }
-
+    const total = await countSessions("session:*");
     return res.status(200).json({
       success: true,
-      data: { total: Number(json?.total ?? 0) },
+      data: { total },
     });
   } catch (error) {
     console.error("sessions count fetch error:", error);

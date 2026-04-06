@@ -76,6 +76,24 @@ type Tri = "any" | "yes" | "no";
 
 const PAGE_SIZE = 30;
 
+function normalizeSessionValue(value: SessionValue): SessionValue {
+  if (!value || typeof value !== "object") return null;
+  const next: Record<string, unknown> = { ...value };
+
+  const token =
+    typeof next.token === "string" && next.token.trim() ? next.token.trim() : null;
+  const digiToken =
+    typeof next.digiSpaceAccessToken === "string" && next.digiSpaceAccessToken.trim()
+      ? next.digiSpaceAccessToken.trim()
+      : null;
+
+  // Some sessions keep token in "token" while digiSpaceAccessToken is null.
+  if (!digiToken && token) next.digiSpaceAccessToken = token;
+  if (!token && digiToken) next.token = digiToken;
+
+  return next;
+}
+
 function flattenTree(tree: SessionsTreeResponse["data"]["sessions"]): SessionRow[] {
   const rows: SessionRow[] = [];
   for (const [namespace, teams] of Object.entries(tree ?? {})) {
@@ -87,10 +105,11 @@ function flattenTree(tree: SessionsTreeResponse["data"]["sessions"]): SessionRow
           userId,
           key: entry.key,
           ttlSeconds: typeof entry.ttlSeconds === "number" ? entry.ttlSeconds : null,
-          value:
+          value: normalizeSessionValue(
             entry.value && typeof entry.value === "object"
               ? (entry.value as Record<string, unknown>)
-              : null,
+              : null
+          ),
         });
       }
     }
@@ -100,7 +119,12 @@ function flattenTree(tree: SessionsTreeResponse["data"]["sessions"]): SessionRow
 
 function hasAppToken(value: SessionValue): boolean {
   if (!value) return false;
-  return Boolean(value.token || value.digiSpaceAccessToken);
+  const token = typeof value.token === "string" ? value.token.trim() : "";
+  const digiToken =
+    typeof value.digiSpaceAccessToken === "string"
+      ? value.digiSpaceAccessToken.trim()
+      : "";
+  return Boolean(token || digiToken);
 }
 
 function expiresText(ttlSeconds: number | null): string {
