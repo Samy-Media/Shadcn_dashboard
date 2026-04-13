@@ -35,7 +35,9 @@ export function PageHeading({
       <div className="min-w-0 flex-1">
         <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
         {description != null ? (
-          <div className="text-muted-foreground mt-1 text-sm">{description}</div>
+          <div className="text-muted-foreground mt-1 flex flex-wrap items-start gap-x-1.5 gap-y-1 text-sm">
+            {description}
+          </div>
         ) : null}
       </div>
     </div>

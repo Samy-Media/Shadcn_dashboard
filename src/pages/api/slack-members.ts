@@ -19,7 +19,7 @@ export default async function handler(
   try {
     // :fire: Simple query – no ORDER BY, no column assumptions
     const { rows } = await pool.query(
-      `SELECT slack_user_id, slack_team_id, email, requester_id, safserv_active,
+      `SELECT slack_user_id, slack_team_id, email, requester_id, safeserv_active,
               created_at, updated_at, atlas_last_sync
        FROM public.users`
     );

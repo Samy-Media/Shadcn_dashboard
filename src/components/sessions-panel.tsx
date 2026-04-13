@@ -7,13 +7,24 @@ import {
   Clock3,
   Eye,
   KeyRound,
+  Loader2,
   RefreshCw,
   Search,
+  Trash2,
 } from "lucide-react";
 
+import { InfoTip } from "@/components/info-tip";
 import { PageHeading } from "@/components/page-heading";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
@@ -150,6 +161,9 @@ export function SessionsPanel() {
 
   const [sheetOpen, setSheetOpen] = React.useState(false);
   const [selected, setSelected] = React.useState<SessionRow | null>(null);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = React.useState(false);
+  const [deleteBusy, setDeleteBusy] = React.useState(false);
+  const [deleteError, setDeleteError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     const t = window.setTimeout(() => setQDebounced(q), 350);
@@ -226,12 +240,50 @@ export function SessionsPanel() {
   const start = filtered.length === 0 ? 0 : page * PAGE_SIZE + 1;
   const end = Math.min((page + 1) * PAGE_SIZE, filtered.length);
 
+  const handleDeleteSession = React.useCallback(async () => {
+    if (!selected) return;
+    setDeleteBusy(true);
+    setDeleteError(null);
+    try {
+      const res = await fetch("/api/sessions/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key: selected.key }),
+      });
+      const json = (await res.json()) as {
+        success?: boolean;
+        message?: string;
+      };
+      if (!res.ok || !json.success) {
+        throw new Error(json.message ?? "Failed to remove session");
+      }
+      setConfirmDeleteOpen(false);
+      setSheetOpen(false);
+      setSelected(null);
+      await fetchData(true);
+    } catch (e) {
+      setDeleteError(e instanceof Error ? e.message : "Failed to remove session");
+    } finally {
+      setDeleteBusy(false);
+    }
+  }, [selected, fetchData]);
+
   return (
     <div className="space-y-6">
       <PageHeading
         icon={KeyRound}
         title="Sessions"
-        description="Live sessions from Redis, grouped and filtered like People."
+        description={
+          <>
+            <span>Browse sessions stored in Redis.</span>
+            <InfoTip label="How this works">
+              <p>
+                Grouped and filtered in a similar way to People. The list is capped
+                when loading for performance.
+              </p>
+            </InfoTip>
+          </>
+        }
       />
 
       <div className="flex flex-wrap items-center gap-2">
@@ -320,16 +372,18 @@ export function SessionsPanel() {
         </div>
         <div className="relative px-2 pb-2 pt-2 sm:px-3">
           <ScrollArea className="h-[min(70vh,720px)] w-full rounded-xl border border-muted-foreground/15 bg-card/50">
-            <Table>
+            <Table className="table-fixed w-full min-w-[720px]">
               <TableHeader>
                 <TableRow className="border-muted-foreground/15 hover:bg-transparent">
-                  <TableHead className="min-w-[150px] font-semibold">Team</TableHead>
-                  <TableHead className="min-w-[160px] font-semibold">User</TableHead>
-                  <TableHead className="min-w-[300px] font-semibold">Email</TableHead>
-                  <TableHead className="min-w-[130px] font-semibold">Token</TableHead>
-                  <TableHead className="min-w-[160px] font-semibold">TTL</TableHead>
-                  <TableHead className="min-w-[320px] font-semibold">Key</TableHead>
-                  <TableHead className="w-[100px] text-right font-semibold">Action</TableHead>
+                  <TableHead className="w-[10%] font-semibold">Team</TableHead>
+                  <TableHead className="w-[11%] font-semibold">User</TableHead>
+                  <TableHead className="w-[22%] font-semibold">Email</TableHead>
+                  <TableHead className="w-[8%] font-semibold">Token</TableHead>
+                  <TableHead className="w-[14%] font-semibold">TTL</TableHead>
+                  <TableHead className="w-[29%] font-semibold">Key</TableHead>
+                  <TableHead className="w-[6%] text-right font-semibold">
+                    Action
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -351,28 +405,45 @@ export function SessionsPanel() {
                     const token = hasAppToken(row.value);
                     return (
                       <TableRow key={row.key} className="border-muted-foreground/10 hover:bg-muted/40">
-                        <TableCell>
-                          <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">{row.teamId}</code>
+                        <TableCell className="max-w-0 align-middle">
+                          <code
+                            className="block truncate rounded bg-muted px-1.5 py-0.5 font-mono text-xs"
+                            title={row.teamId}
+                          >
+                            {row.teamId}
+                          </code>
                         </TableCell>
-                        <TableCell>
-                          <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">{row.userId}</code>
+                        <TableCell className="max-w-0 align-middle">
+                          <code
+                            className="block truncate rounded bg-muted px-1.5 py-0.5 font-mono text-xs"
+                            title={row.userId}
+                          >
+                            {row.userId}
+                          </code>
                         </TableCell>
-                        <TableCell className="max-w-[320px] truncate">{email}</TableCell>
-                        <TableCell>
-                          {token ? <Badge>Yes</Badge> : <Badge variant="secondary">No</Badge>}
-                        </TableCell>
-                        <TableCell>
-                          <span className="inline-flex items-center gap-1 text-sm text-muted-foreground">
-                            <Clock3 className="size-3.5" />
-                            {expiresText(row.ttlSeconds)}
+                        <TableCell className="max-w-0 align-middle">
+                          <span className="block truncate text-sm" title={email}>
+                            {email}
                           </span>
                         </TableCell>
-                        <TableCell className="max-w-[360px]">
-                          <code className="truncate rounded bg-muted px-1.5 py-0.5 font-mono text-xs">
+                        <TableCell className="max-w-0 align-middle">
+                          {token ? <Badge>Yes</Badge> : <Badge variant="secondary">No</Badge>}
+                        </TableCell>
+                        <TableCell className="max-w-0 align-middle whitespace-nowrap">
+                          <span className="inline-flex max-w-full items-center gap-1 truncate text-sm text-muted-foreground">
+                            <Clock3 className="size-3.5 shrink-0" />
+                            <span className="truncate">{expiresText(row.ttlSeconds)}</span>
+                          </span>
+                        </TableCell>
+                        <TableCell className="max-w-0 align-middle">
+                          <code
+                            className="block truncate rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] leading-snug"
+                            title={row.key}
+                          >
                             {row.key}
                           </code>
                         </TableCell>
-                        <TableCell className="text-right">
+                        <TableCell className="max-w-0 text-right align-middle">
                           <Button
                             type="button"
                             variant="outline"
@@ -449,10 +520,87 @@ export function SessionsPanel() {
                   {JSON.stringify(selected.value ?? {}, null, 2)}
                 </pre>
               </div>
+              <div className="rounded-xl border border-destructive/25 bg-destructive/5 p-4">
+                <p className="text-sm font-medium text-destructive">
+                  Hard reset
+                </p>
+                <p className="text-muted-foreground mt-1 text-xs leading-relaxed">
+                  Deletes this Redis key immediately. The user will need to sign in again
+                  on next use.
+                </p>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="sm"
+                  className="mt-3 rounded-lg"
+                  onClick={() => {
+                    setDeleteError(null);
+                    setConfirmDeleteOpen(true);
+                  }}
+                >
+                  <Trash2 className="mr-1.5 size-3.5" />
+                  Remove session
+                </Button>
+              </div>
             </div>
           ) : null}
         </SheetContent>
       </Sheet>
+
+      <Dialog
+        open={confirmDeleteOpen}
+        onOpenChange={(open) => {
+          setConfirmDeleteOpen(open);
+          if (!open) setDeleteError(null);
+        }}
+      >
+        <DialogContent showCloseButton={!deleteBusy} className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Remove this session?</DialogTitle>
+            <DialogDescription asChild>
+              <div className="space-y-2 pt-1">
+                <p>
+                  This will delete the Redis key and cannot be undone. Confirm the key
+                  below.
+                </p>
+                {selected ? (
+                  <code className="bg-muted block max-h-24 overflow-auto rounded-md p-2 text-left text-[11px] leading-relaxed break-all">
+                    {selected.key}
+                  </code>
+                ) : null}
+              </div>
+            </DialogDescription>
+          </DialogHeader>
+          {deleteError ? (
+            <p className="text-destructive text-sm">{deleteError}</p>
+          ) : null}
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="outline"
+              className="rounded-lg"
+              disabled={deleteBusy}
+              onClick={() => setConfirmDeleteOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              className="rounded-lg"
+              disabled={deleteBusy || !selected}
+              onClick={() => void handleDeleteSession()}
+            >
+              {deleteBusy ? (
+                <Loader2 className="mr-2 size-4 animate-spin" />
+              ) : (
+                <Trash2 className="mr-2 size-4" />
+              )}
+              Remove
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

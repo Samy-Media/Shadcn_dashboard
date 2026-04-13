@@ -13,6 +13,7 @@ export type SessionTree = Record<
 
 type RedisClient = {
   scan: (...args: unknown[]) => Promise<[string, string[]]>;
+  del: (...keys: string[]) => Promise<number>;
   pipeline: () => {
     get: (key: string) => unknown;
     ttl: (key: string) => unknown;
@@ -140,4 +141,25 @@ export function toSessionTree(entries: SessionEntry[]): SessionTree {
     tree[namespace][teamId][userId] = entry;
   }
   return tree;
+}
+
+/** Allowed Redis keys for session rows — must match how we scan `session:*`. */
+function isAllowedSessionKey(key: string): boolean {
+  const k = key.trim();
+  if (k.length < 8 || k.length > 1024) return false;
+  if (!k.startsWith("session:")) return false;
+  return /^session:[A-Za-z0-9:_-]+$/.test(k);
+}
+
+/**
+ * Deletes one session key from Redis (hard reset for that user/team binding).
+ * @returns whether a key was removed (false if it was already absent)
+ */
+export async function deleteSessionByKey(key: string): Promise<boolean> {
+  if (!isAllowedSessionKey(key)) {
+    throw new Error("Invalid session key");
+  }
+  const redis = getRedisClient();
+  const removed = await redis.del(key);
+  return removed > 0;
 }

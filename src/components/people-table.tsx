@@ -1,19 +1,22 @@
 "use client";
 
 import * as React from "react";
+import { useRouter } from "next/router";
 import { format, formatDistanceToNow } from "date-fns";
 import {
   ArrowDownAZ,
+  Bot,
   Mail,
   RefreshCw,
   Search,
   UserCircle2,
   Users,
-  Eye,
+  ExternalLink,
   Hash,
   Building2,
   Clock,
   Filter,
+  Globe2,
   LayoutGrid,
   SlidersHorizontal,
 } from "lucide-react";
@@ -38,15 +41,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
 import {
   Table,
   TableBody,
@@ -60,6 +55,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { InfoTip } from "@/components/info-tip";
 import { PageHeading } from "@/components/page-heading";
 import { cn } from "@/lib/utils";
 
@@ -68,7 +64,10 @@ export type UserRecord = {
   slack_team_id: string;
   email: string | null;
   requester_id: string | null;
-  safserv_active: boolean | null;
+  safeserv_active: boolean | null;
+  digispace_active: boolean | null;
+  is_agent: boolean | null;
+  agent_requester_id: string | null;
   created_at: string | null;
   updated_at: string | null;
   atlas_last_sync: string | null;
@@ -78,14 +77,34 @@ const PAGE_SIZE = 30;
 
 type Tri = "any" | "yes" | "no";
 
-/** Which integrated app to filter by (matches Jobs status bucket pattern). */
-export type PeopleAppFilter = "all" | "safserv" | "not_safserv";
+/** SafeServ enrollment filter (public.users.safeserv_active). */
+export type PeopleSafeservFilter = "all" | "safeserv" | "not_safeserv";
 
-const APP_FILTER_PILLS: { id: PeopleAppFilter; label: string; hint: string }[] = [
-  { id: "all", label: "All users", hint: "Everyone in the directory" },
-  { id: "safserv", label: "Safserv", hint: "safserv_active is true" },
-  { id: "not_safserv", label: "Not on Safserv", hint: "Inactive or not enrolled" },
+const SAFESERV_FILTER_PILLS: {
+  id: PeopleSafeservFilter;
+  label: string;
+  hint: string;
+}[] = [
+  { id: "all", label: "All users", hint: "Everyone (no SafeServ filter)" },
+  { id: "safeserv", label: "SafeServ", hint: "safeserv_active is true" },
+  { id: "not_safeserv", label: "Not on SafeServ", hint: "Inactive or not enrolled" },
 ];
+
+/** Digispace filter (public.users.digispace_active) — same shape as SafeServ row. */
+export type PeopleDigispaceFilter = "all" | "digispace" | "not_digispace";
+
+const DIGISPACE_FILTER_PILLS: {
+  id: PeopleDigispaceFilter;
+  label: string;
+  hint: string;
+}[] = [
+  { id: "all", label: "All users", hint: "Everyone (no Digispace filter)" },
+  { id: "digispace", label: "Digispace", hint: "digispace_active is true" },
+  { id: "not_digispace", label: "Not on Digispace", hint: "Inactive or not enrolled" },
+];
+
+/** @deprecated use PeopleSafeservFilter */
+export type PeopleAppFilter = PeopleSafeservFilter;
 
 function buildUsersQuery(params: {
   limit: number;
@@ -94,7 +113,9 @@ function buildUsersQuery(params: {
   slackUserId: string;
   requesterId: string;
   hasEmail: Tri;
-  appFilter: PeopleAppFilter;
+  safeservFilter: PeopleSafeservFilter;
+  digispaceFilter: PeopleDigispaceFilter;
+  agentFilter: Tri;
   sort: UserListSort;
 }): string {
   const p = new URLSearchParams();
@@ -106,8 +127,12 @@ function buildUsersQuery(params: {
   if (params.requesterId.trim()) p.set("requester_id", params.requesterId.trim());
   if (params.hasEmail === "yes") p.set("has_email", "yes");
   if (params.hasEmail === "no") p.set("has_email", "no");
-  if (params.appFilter === "safserv") p.set("safserv_active", "yes");
-  if (params.appFilter === "not_safserv") p.set("safserv_active", "no");
+  if (params.safeservFilter === "safeserv") p.set("safeserv_active", "yes");
+  if (params.safeservFilter === "not_safeserv") p.set("safeserv_active", "no");
+  if (params.digispaceFilter === "digispace") p.set("digispace_active", "yes");
+  if (params.digispaceFilter === "not_digispace") p.set("digispace_active", "no");
+  if (params.agentFilter === "yes") p.set("is_agent", "yes");
+  if (params.agentFilter === "no") p.set("is_agent", "no");
   return p.toString();
 }
 
@@ -124,30 +149,6 @@ function initialsFromUser(user: Pick<UserRecord, "email" | "slack_user_id">) {
   return user.slack_user_id.replace(/^U/, "").slice(0, 2).toUpperCase() || "—";
 }
 
-function DetailRow({
-  label,
-  value,
-  mono,
-}: {
-  label: string;
-  value: React.ReactNode;
-  mono?: boolean;
-}) {
-  return (
-    <div className="grid grid-cols-[minmax(0,140px)_1fr] gap-x-4 gap-y-1 text-sm sm:grid-cols-[160px_1fr]">
-      <span className="text-muted-foreground">{label}</span>
-      <span
-        className={cn(
-          "min-w-0 break-all font-medium",
-          mono && "font-mono text-[13px]"
-        )}
-      >
-        {value ?? "—"}
-      </span>
-    </div>
-  );
-}
-
 export function ProductTable() {
   const [users, setUsers] = React.useState<UserRecord[]>([]);
   const [total, setTotal] = React.useState(0);
@@ -159,14 +160,14 @@ export function ProductTable() {
   const [slackUserIdFilter, setSlackUserIdFilter] = React.useState("");
   const [requesterIdFilter, setRequesterIdFilter] = React.useState("");
   const [hasEmail, setHasEmail] = React.useState<Tri>("any");
-  const [appFilter, setAppFilter] = React.useState<PeopleAppFilter>("all");
+  const [safeservFilter, setSafeservFilter] =
+    React.useState<PeopleSafeservFilter>("all");
+  const [digispaceFilter, setDigispaceFilter] =
+    React.useState<PeopleDigispaceFilter>("all");
+  const [agentFilter, setAgentFilter] = React.useState<Tri>("any");
   const [sort, setSort] = React.useState<UserListSort>("updated_at_desc");
 
-  const [sheetOpen, setSheetOpen] = React.useState(false);
-  const [selectedId, setSelectedId] = React.useState<string | null>(null);
-  const [detail, setDetail] = React.useState<UserRecord | null>(null);
-  const [detailLoading, setDetailLoading] = React.useState(false);
-  const [detailError, setDetailError] = React.useState<string | null>(null);
+  const router = useRouter();
 
   React.useEffect(() => {
     const t = window.setTimeout(() => setQDebounced(q), 380);
@@ -175,7 +176,16 @@ export function ProductTable() {
 
   React.useEffect(() => {
     setPage(0);
-  }, [qDebounced, slackUserIdFilter, requesterIdFilter, hasEmail, appFilter, sort]);
+  }, [
+    qDebounced,
+    slackUserIdFilter,
+    requesterIdFilter,
+    hasEmail,
+    safeservFilter,
+    digispaceFilter,
+    agentFilter,
+    sort,
+  ]);
 
   const fetchUsers = React.useCallback(
     async (isRefresh = false) => {
@@ -189,7 +199,9 @@ export function ProductTable() {
           slackUserId: slackUserIdFilter,
           requesterId: requesterIdFilter,
           hasEmail,
-          appFilter,
+          safeservFilter,
+          digispaceFilter,
+          agentFilter,
           sort,
         });
         const res = await fetch(`/api/users?${qs}`);
@@ -213,7 +225,9 @@ export function ProductTable() {
       slackUserIdFilter,
       requesterIdFilter,
       hasEmail,
-      appFilter,
+      safeservFilter,
+      digispaceFilter,
+      agentFilter,
       sort,
     ]
   );
@@ -229,50 +243,15 @@ export function ProductTable() {
     setSlackUserIdFilter("");
     setRequesterIdFilter("");
     setHasEmail("any");
-    setAppFilter("all");
+    setSafeservFilter("all");
+    setDigispaceFilter("all");
+    setAgentFilter("any");
     setSort("updated_at_desc");
   };
-
-  const openDetail = (slackUserId: string) => {
-    setSelectedId(slackUserId);
-    setDetail(null);
-    setDetailError(null);
-    setSheetOpen(true);
-  };
-
-  React.useEffect(() => {
-    if (!sheetOpen || !selectedId) return;
-    let cancelled = false;
-    (async () => {
-      setDetailLoading(true);
-      setDetailError(null);
-      try {
-        const res = await fetch(
-          `/api/users/${encodeURIComponent(selectedId)}`
-        );
-        const json = await res.json();
-        if (!res.ok || !json.success) {
-          throw new Error(json.message ?? "Could not load user");
-        }
-        if (!cancelled) setDetail(json.data as UserRecord);
-      } catch (e) {
-        if (!cancelled) {
-          setDetailError(e instanceof Error ? e.message : "Error");
-        }
-      } finally {
-        if (!cancelled) setDetailLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [sheetOpen, selectedId]);
 
   const start = total === 0 ? 0 : page * PAGE_SIZE + 1;
   const end = Math.min((page + 1) * PAGE_SIZE, total);
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-
-  const show = detail ?? users.find((u) => u.slack_user_id === selectedId);
 
   return (
     <div className="space-y-6">
@@ -281,46 +260,80 @@ export function ProductTable() {
         title="People"
         description={
           <>
-            Search and filter onboarded rows from{" "}
-            <code className="rounded bg-muted px-1.5 py-0.5 text-[0.8rem]">
-              public.users
-            </code>
-            — same advanced pattern as Jobs.
+            <span>Search and open people in your directory.</span>
+            <InfoTip label="About this data">
+              <p>
+                Stored in <code>public.users</code>. SafeServ and Digispace rows
+                filter <code>safeserv_active</code> and <code>digispace_active</code>{" "}
+                independently (same pill pattern for each).
+              </p>
+            </InfoTip>
           </>
         }
       />
 
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="flex min-w-0 flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-3">
-          <span className="text-muted-foreground flex shrink-0 items-center gap-1.5 text-xs font-medium">
-            <LayoutGrid className="size-3.5 opacity-70" aria-hidden />
-            App
-          </span>
-          <div className="flex flex-wrap gap-1.5 rounded-xl border border-border/60 bg-muted/30 p-1">
-            {APP_FILTER_PILLS.map(({ id, label, hint }) => (
-              <Tooltip key={id}>
-                <TooltipTrigger asChild>
-                  <Button
-                    type="button"
-                    variant={appFilter === id ? "default" : "ghost"}
-                    size="sm"
-                    className="h-8 rounded-lg px-3 text-xs"
-                    onClick={() => {
-                      setAppFilter(id);
-                      setPage(0);
-                    }}
-                  >
-                    {label}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom" className="max-w-[220px] text-xs">
-                  {hint}
-                </TooltipContent>
-              </Tooltip>
-            ))}
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between sm:gap-4">
+        <div className="flex min-w-0 flex-1 flex-col gap-3">
+          <div className="flex min-w-0 flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-3">
+            <span className="text-muted-foreground flex w-[7.5rem] shrink-0 items-center gap-1.5 text-xs font-medium">
+              <LayoutGrid className="size-3.5 opacity-70" aria-hidden />
+              SafeServ
+            </span>
+            <div className="flex min-w-0 flex-1 flex-wrap gap-1.5 rounded-xl border border-border/60 bg-muted/30 p-1">
+              {SAFESERV_FILTER_PILLS.map(({ id, label, hint }) => (
+                <Tooltip key={id}>
+                  <TooltipTrigger asChild>
+                    <Button
+                      type="button"
+                      variant={safeservFilter === id ? "default" : "ghost"}
+                      size="sm"
+                      className="h-8 rounded-lg px-3 text-xs"
+                      onClick={() => {
+                        setSafeservFilter(id);
+                        setPage(0);
+                      }}
+                    >
+                      {label}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="max-w-[220px] text-xs">
+                    {hint}
+                  </TooltipContent>
+                </Tooltip>
+              ))}
+            </div>
+          </div>
+          <div className="flex min-w-0 flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-3">
+            <span className="text-muted-foreground flex w-[7.5rem] shrink-0 items-center gap-1.5 text-xs font-medium">
+              <Globe2 className="size-3.5 opacity-70" aria-hidden />
+              Digispace
+            </span>
+            <div className="flex min-w-0 flex-1 flex-wrap gap-1.5 rounded-xl border border-border/60 bg-muted/30 p-1">
+              {DIGISPACE_FILTER_PILLS.map(({ id, label, hint }) => (
+                <Tooltip key={id}>
+                  <TooltipTrigger asChild>
+                    <Button
+                      type="button"
+                      variant={digispaceFilter === id ? "default" : "ghost"}
+                      size="sm"
+                      className="h-8 rounded-lg px-3 text-xs"
+                      onClick={() => {
+                        setDigispaceFilter(id);
+                        setPage(0);
+                      }}
+                    >
+                      {label}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="max-w-[220px] text-xs">
+                    {hint}
+                  </TooltipContent>
+                </Tooltip>
+              ))}
+            </div>
           </div>
         </div>
-        <div className="ml-auto flex flex-wrap items-center gap-2">
+        <div className="flex shrink-0 flex-wrap items-center gap-2 sm:pt-0">
           <Button
             type="button"
             variant="outline"
@@ -351,7 +364,7 @@ export function ProductTable() {
           <div className="relative min-w-0 flex-1">
             <Search className="text-muted-foreground absolute left-3 top-1/2 size-4 -translate-y-1/2" />
             <Input
-              placeholder="Search Slack user ID, email, team, requester…"
+              placeholder="Search user, email, team, requester, agent IDs, workspaces…"
               value={q}
               onChange={(e) => setQ(e.target.value)}
               className="h-10 rounded-xl border-border/60 pl-9"
@@ -374,6 +387,25 @@ export function ProductTable() {
                   <SelectItem value="any">Any</SelectItem>
                   <SelectItem value="yes">Has email</SelectItem>
                   <SelectItem value="no">No email</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Agent</Label>
+              <Select
+                value={agentFilter}
+                onValueChange={(v) => {
+                  setAgentFilter(v as Tri);
+                  setPage(0);
+                }}
+              >
+                <SelectTrigger className="h-10 w-[158px] rounded-xl">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="any">Any</SelectItem>
+                  <SelectItem value="yes">Agent mode</SelectItem>
+                  <SelectItem value="no">Not agent</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -465,7 +497,7 @@ export function ProductTable() {
         </div>
         <div className="relative px-2 pb-2 pt-2 sm:px-3">
           <ScrollArea className="h-[min(70vh,720px)] w-full rounded-xl border border-muted-foreground/15 bg-card/50">
-            <Table>
+            <Table className="min-w-[1180px]">
               <TableHeader>
                 <TableRow className="border-muted-foreground/15 hover:bg-transparent">
                   <TableHead className="w-[52px] pl-6"> </TableHead>
@@ -481,8 +513,23 @@ export function ProductTable() {
                   <TableHead className="min-w-[100px] font-semibold">
                     Requester
                   </TableHead>
-                  <TableHead className="min-w-[120px] font-semibold">
-                    Safserv
+                  <TableHead className="min-w-[100px] font-semibold">
+                    SafeServ
+                  </TableHead>
+                  <TableHead className="min-w-[100px] font-semibold">
+                    Digispace
+                  </TableHead>
+                  <TableHead className="min-w-[100px] font-semibold">
+                    <span className="inline-flex items-center gap-1">
+                      <Bot className="size-3.5 opacity-70" />
+                      Agent
+                    </span>
+                  </TableHead>
+                  <TableHead className="min-w-[140px] font-semibold">
+                    Created
+                  </TableHead>
+                  <TableHead className="min-w-[140px] font-semibold">
+                    Atlas sync
                   </TableHead>
                   <TableHead className="min-w-[160px] font-semibold">
                     Updated
@@ -515,6 +562,18 @@ export function ProductTable() {
                         <Skeleton className="h-4 w-20" />
                       </TableCell>
                       <TableCell>
+                        <Skeleton className="h-4 w-16" />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton className="h-4 w-16" />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton className="h-4 w-32" />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton className="h-4 w-32" />
+                      </TableCell>
+                      <TableCell>
                         <Skeleton className="h-4 w-36" />
                       </TableCell>
                       <TableCell className="pr-6 text-right">
@@ -525,7 +584,7 @@ export function ProductTable() {
                 ) : users.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={8}
+                      colSpan={12}
                       className="h-64 text-center align-middle"
                     >
                       <div className="text-muted-foreground flex flex-col items-center justify-center gap-2 px-4">
@@ -587,14 +646,78 @@ export function ProductTable() {
                         )}
                       </TableCell>
                       <TableCell>
-                        {u.safserv_active === true ? (
+                        {u.safeserv_active === true ? (
                           <Badge className="font-normal">Active</Badge>
-                        ) : u.safserv_active === false ? (
+                        ) : u.safeserv_active === false ? (
                           <Badge variant="secondary" className="font-normal">
                             Off
                           </Badge>
                         ) : (
                           <span className="text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {u.digispace_active === true ? (
+                          <Badge className="font-normal">Active</Badge>
+                        ) : u.digispace_active === false ? (
+                          <Badge variant="secondary" className="font-normal">
+                            Off
+                          </Badge>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {u.is_agent === true ? (
+                          <Badge className="font-normal">
+                            <Bot className="mr-1 size-3" />
+                            Yes
+                          </Badge>
+                        ) : u.is_agent === false ? (
+                          <Badge variant="secondary" className="font-normal">
+                            No
+                          </Badge>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {u.created_at ? (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="text-muted-foreground inline-flex cursor-default items-center gap-1.5 text-sm">
+                                <Clock className="size-3.5" />
+                                {formatDistanceToNow(new Date(u.created_at), {
+                                  addSuffix: true,
+                                })}
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="font-mono text-xs">
+                              {format(new Date(u.created_at), "PPpp")}
+                            </TooltipContent>
+                          </Tooltip>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {u.atlas_last_sync ? (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="inline-flex cursor-default items-center gap-1.5 text-sm text-emerald-700 dark:text-emerald-400">
+                                <Clock className="size-3.5 opacity-80" />
+                                {formatDistanceToNow(
+                                  new Date(u.atlas_last_sync),
+                                  { addSuffix: true }
+                                )}
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="font-mono text-xs">
+                              {format(new Date(u.atlas_last_sync), "PPpp")}
+                            </TooltipContent>
+                          </Tooltip>
+                        ) : (
+                          <span className="text-muted-foreground">Never</span>
                         )}
                       </TableCell>
                       <TableCell>
@@ -623,10 +746,14 @@ export function ProductTable() {
                           variant="outline"
                           size="sm"
                           className="rounded-lg"
-                          onClick={() => openDetail(u.slack_user_id)}
+                          onClick={() =>
+                            void router.push(
+                              `/dashboard/people/${encodeURIComponent(u.slack_user_id)}/${encodeURIComponent(u.slack_team_id)}`
+                            )
+                          }
                         >
-                          <Eye className="mr-1.5 size-3.5" />
-                          View
+                          <ExternalLink className="mr-1.5 size-3.5" />
+                          Open
                         </Button>
                       </TableCell>
                     </TableRow>
@@ -641,7 +768,8 @@ export function ProductTable() {
         <div className="text-muted-foreground flex flex-wrap items-center justify-between gap-2 border-t bg-muted/20 px-4 py-3 text-xs sm:px-6">
           <span className="flex items-center gap-1">
             <Hash className="size-3" />
-            Primary key: <code className="text-foreground">slack_user_id</code>
+            Primary key:{" "}
+            <code className="text-foreground">(slack_user_id, slack_team_id)</code>
           </span>
           <div className="flex flex-wrap items-center gap-2">
             <Button
@@ -667,148 +795,6 @@ export function ProductTable() {
           </div>
         </div>
       </div>
-
-      <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-        <SheetContent
-          side="right"
-          className="flex w-full flex-col gap-0 overflow-y-auto border-l bg-background/95 p-0 backdrop-blur supports-[backdrop-filter]:bg-background/80 sm:max-w-lg"
-        >
-          <SheetHeader className="space-y-3 border-b bg-muted/30 px-6 py-6 text-left">
-            <div className="flex items-start gap-4">
-              <Avatar className="size-14 border-2 border-primary/20 shadow-md">
-                <AvatarFallback className="bg-primary/15 text-primary text-lg font-semibold">
-                  {show ? initialsFromUser(show) : "—"}
-                </AvatarFallback>
-              </Avatar>
-              <div className="min-w-0 flex-1 space-y-1">
-                <SheetTitle className="text-xl leading-tight">
-                  User details
-                </SheetTitle>
-                <SheetDescription className="text-base">
-                  {selectedId ? (
-                    <code className="rounded-md bg-muted px-2 py-0.5 font-mono text-sm text-foreground">
-                      {selectedId}
-                    </code>
-                  ) : (
-                    "Select a user"
-                  )}
-                </SheetDescription>
-              </div>
-            </div>
-          </SheetHeader>
-
-          <div className="flex flex-1 flex-col gap-6 px-6 py-6">
-            {detailLoading ? (
-              <div className="space-y-4">
-                <Skeleton className="h-4 w-3/4" />
-                <Skeleton className="h-4 w-full" />
-                <Skeleton className="h-4 w-5/6" />
-                <Skeleton className="h-4 w-2/3" />
-              </div>
-            ) : detailError ? (
-              <p className="text-destructive text-sm">{detailError}</p>
-            ) : show ? (
-              <>
-                <div className="space-y-4">
-                  <h3 className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">
-                    Identity & workspace
-                  </h3>
-                  <div className="space-y-3 rounded-xl border bg-card/80 p-4 shadow-sm">
-                    <DetailRow
-                      label="Slack user ID"
-                      value={<span className="font-mono">{show.slack_user_id}</span>}
-                      mono
-                    />
-                    <Separator />
-                    <DetailRow label="Email" value={show.email} />
-                    <Separator />
-                    <DetailRow
-                      label="Slack team ID"
-                      value={show.slack_team_id || "—"}
-                      mono
-                    />
-                    <Separator />
-                    <DetailRow
-                      label="Requester ID"
-                      value={show.requester_id}
-                      mono
-                    />
-                    <Separator />
-                    <DetailRow
-                      label="Safserv active"
-                      value={
-                        show.safserv_active === true
-                          ? "Yes"
-                          : show.safserv_active === false
-                            ? "No"
-                            : "—"
-                      }
-                    />
-                    <Separator />
-                    <DetailRow
-                      label="Created"
-                      value={
-                        show.created_at
-                          ? format(new Date(show.created_at), "PPpp")
-                          : "—"
-                      }
-                    />
-                    <Separator />
-                    <DetailRow
-                      label="Updated"
-                      value={
-                        show.updated_at
-                          ? format(new Date(show.updated_at), "PPpp")
-                          : "—"
-                      }
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <h3 className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">
-                    Sync
-                  </h3>
-                  <div className="space-y-3 rounded-xl border bg-card/80 p-4 shadow-sm">
-                    <DetailRow
-                      label="Atlas last sync"
-                      value={
-                        show.atlas_last_sync ? (
-                          <span>
-                            {format(
-                              new Date(show.atlas_last_sync),
-                              "PPpp"
-                            )}{" "}
-                            <span className="text-muted-foreground block text-xs font-normal sm:inline sm:before:content-['·_']">
-                              (
-                              {formatDistanceToNow(
-                                new Date(show.atlas_last_sync),
-                                { addSuffix: true }
-                              )}
-                              )
-                            </span>
-                          </span>
-                        ) : (
-                          <span className="text-muted-foreground">Never synced</span>
-                        )
-                      }
-                    />
-                  </div>
-                </div>
-
-                <p className="text-muted-foreground text-xs">
-                  Data loaded from{" "}
-                  <code className="rounded bg-muted px-1 py-0.5">GET</code>{" "}
-                  <code className="break-all rounded bg-muted px-1 py-0.5 text-[11px]">
-                    /api/users/
-                    {selectedId ? encodeURIComponent(selectedId) : ""}
-                  </code>
-                </p>
-              </>
-            ) : null}
-          </div>
-        </SheetContent>
-      </Sheet>
     </div>
   );
 }

@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 
 import type { JobRow } from "@/lib/operations-queries";
+import { InfoTip } from "@/components/info-tip";
 import { PageHeading } from "@/components/page-heading";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -286,12 +287,13 @@ export function JobsPanel() {
         title="Jobs"
         description={
           <>
-            Queue rows from{" "}
-            <code className="rounded bg-muted px-1.5 py-0.5 text-[0.8rem]">
-              public.jobs
-            </code>{" "}
-            — filter, inspect <code className="text-[0.8rem]">result</code>{" "}
-            JSON, and errors.
+            <span>Browse background jobs, results, and errors.</span>
+            <InfoTip label="About this data">
+              <p>
+                Rows come from <code>public.jobs</code>. Open a job to inspect{" "}
+                <code>result</code> JSON and error messages.
+              </p>
+            </InfoTip>
           </>
         }
       />

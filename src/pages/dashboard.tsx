@@ -7,9 +7,13 @@ import {
   DashboardShell,
   type DashboardNavId,
 } from "@/components/dashboard-shell";
+import { HealthPanel } from "@/components/health-panel";
+import { InstallationsPanel } from "@/components/installations-panel";
+import { AtlasJobsPanel } from "@/components/atlas-jobs-panel";
+import { JobsPanel } from "@/components/jobs-panel";
+import { MessagesPanel } from "@/components/messages-panel";
 import { OperationsDashboard } from "@/components/operations-dashboard";
 import { ProductTable } from "@/components/people-table";
-import { JobsPanel } from "@/components/jobs-panel";
 import { SessionsPanel } from "@/components/sessions-panel";
 
 function parseTab(
@@ -18,7 +22,11 @@ function parseTab(
   const v = Array.isArray(tab) ? tab[0] : tab;
   if (v === "people") return "People";
   if (v === "jobs") return "Jobs";
+  if (v === "messages") return "Messages";
+  if (v === "atlas") return "Atlas";
   if (v === "sessions") return "Sessions";
+  if (v === "installations") return "Installations";
+  if (v === "health") return "Health";
   return "Dashboard";
 }
 
@@ -44,7 +52,19 @@ export default function Page() {
         void router.replace("/dashboard", undefined, { shallow: true });
       } else {
         const tab =
-          id === "People" ? "people" : id === "Jobs" ? "jobs" : "sessions";
+          id === "People"
+            ? "people"
+            : id === "Jobs"
+              ? "jobs"
+              : id === "Messages"
+                ? "messages"
+                : id === "Atlas"
+                  ? "atlas"
+                  : id === "Sessions"
+                    ? "sessions"
+                    : id === "Installations"
+                      ? "installations"
+                      : "health";
         void router.replace(`/dashboard?tab=${tab}`, undefined, { shallow: true });
       }
     },
@@ -70,8 +90,16 @@ export default function Page() {
         <ProductTable />
       ) : activePage === "Jobs" ? (
         <JobsPanel />
-      ) : (
+      ) : activePage === "Messages" ? (
+        <MessagesPanel />
+      ) : activePage === "Atlas" ? (
+        <AtlasJobsPanel />
+      ) : activePage === "Sessions" ? (
         <SessionsPanel />
+      ) : activePage === "Installations" ? (
+        <InstallationsPanel />
+      ) : (
+        <HealthPanel />
       )}
     </DashboardShell>
   );

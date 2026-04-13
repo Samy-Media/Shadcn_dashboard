@@ -1,9 +1,23 @@
 -- People / public.users — align with app (run once: psql $DATABASE_URL -f this file)
 BEGIN;
 
+-- Legacy column name was safserv_active; app uses safeserv_active (SafeServ).
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'users' AND column_name = 'safserv_active'
+  ) AND NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'users' AND column_name = 'safeserv_active'
+  ) THEN
+    ALTER TABLE public.users RENAME COLUMN safserv_active TO safeserv_active;
+  END IF;
+END $$;
+
 ALTER TABLE public.users
   ADD COLUMN IF NOT EXISTS atlas_last_sync TIMESTAMPTZ,
-  ADD COLUMN IF NOT EXISTS safserv_active BOOLEAN,
+  ADD COLUMN IF NOT EXISTS safeserv_active BOOLEAN,
   ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW(),
   ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
 

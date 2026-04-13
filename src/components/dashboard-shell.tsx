@@ -2,11 +2,15 @@
 
 import * as React from "react";
 import {
+  Activity,
   GalleryVerticalEnd,
+  Globe2,
+  KeyRound,
   Layers,
   LogOut,
+  MessageSquare,
   PieChart,
-  KeyRound,
+  Plug2,
   Users,
 } from "lucide-react";
 
@@ -15,7 +19,15 @@ import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import { ModeToggle } from "@/components/ModeToggle";
 
-export type DashboardNavId = "Dashboard" | "People" | "Jobs" | "Sessions";
+export type DashboardNavId =
+  | "Dashboard"
+  | "People"
+  | "Jobs"
+  | "Messages"
+  | "Atlas"
+  | "Sessions"
+  | "Installations"
+  | "Health";
 
 const NAV: {
   id: DashboardNavId;
@@ -25,7 +37,11 @@ const NAV: {
   { id: "Dashboard", label: "Overview", icon: PieChart },
   { id: "People", label: "People", icon: Users },
   { id: "Jobs", label: "Jobs", icon: Layers },
+  { id: "Messages", label: "Messages", icon: MessageSquare },
+  { id: "Atlas", label: "Atlas", icon: Globe2 },
   { id: "Sessions", label: "Sessions", icon: KeyRound },
+  { id: "Installations", label: "Installations", icon: Plug2 },
+  { id: "Health", label: "Health", icon: Activity },
 ];
 
 type DashboardShellProps = {

@@ -36,17 +36,31 @@ export default async function handler(
 
     const hasEmailRaw = q.has_email;
     const hasEmailStr = Array.isArray(hasEmailRaw) ? hasEmailRaw[0] : hasEmailRaw;
-    const safservRaw = q.safserv_active;
-    const safservStr = Array.isArray(safservRaw) ? safservRaw[0] : safservRaw;
+    const safeservRaw = q.safeserv_active;
+    const safeservStr = Array.isArray(safeservRaw) ? safeservRaw[0] : safeservRaw;
+    const digiRaw = q.digispace_active;
+    const digiStr = Array.isArray(digiRaw) ? digiRaw[0] : digiRaw;
+    const agentRaw = q.is_agent;
+    const agentStr = Array.isArray(agentRaw) ? agentRaw[0] : agentRaw;
 
     let hasEmail: boolean | undefined;
     if (typeof hasEmailStr === "string" && hasEmailStr.trim()) {
       hasEmail = parseTri(hasEmailStr);
     }
 
-    let safservActive: boolean | undefined;
-    if (typeof safservStr === "string" && safservStr.trim()) {
-      safservActive = parseTri(safservStr);
+    let safeservActive: boolean | undefined;
+    if (typeof safeservStr === "string" && safeservStr.trim()) {
+      safeservActive = parseTri(safeservStr);
+    }
+
+    let digispaceActive: boolean | undefined;
+    if (typeof digiStr === "string" && digiStr.trim()) {
+      digispaceActive = parseTri(digiStr);
+    }
+
+    let isAgent: boolean | undefined;
+    if (typeof agentStr === "string" && agentStr.trim()) {
+      isAgent = parseTri(agentStr);
     }
 
     const sortRaw = q.sort;
@@ -68,7 +82,9 @@ export default async function handler(
           ? q.requester_id
           : undefined,
       hasEmail,
-      safservActive,
+      safeservActive,
+      digispaceActive,
+      isAgent,
       sort,
     };
 
