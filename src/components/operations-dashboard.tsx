@@ -55,7 +55,7 @@ type StatsPayload = {
     failed: number;
     completed: number;
   };
-  jobsLast4h: {
+  jobsLast7d: {
     bucket: string;
     completed: number;
     failed: number;
@@ -182,9 +182,9 @@ export function OperationsDashboard() {
   }, []);
 
   const jobsTimeSeriesData = React.useMemo(() => {
-    if (!stats?.jobsLast4h?.length) return [];
-    return stats.jobsLast4h.map((b) => ({
-      label: format(new Date(b.bucket), "HH:mm"),
+    if (!stats?.jobsLast7d?.length) return [];
+    return stats.jobsLast7d.map((b) => ({
+      label: format(new Date(b.bucket), "MMM d"),
       queued: b.queued,
       failed: b.failed,
       completed: b.completed,
@@ -466,18 +466,17 @@ export function OperationsDashboard() {
                     <span className="font-medium text-foreground">
                       {s?.jobs.total}
                     </span>{" "}
-                    jobs in total. The chart is the last four hours (15-minute
-                    slices).
+                    jobs in total. The chart is the last 7 days.
                   </span>
                   <InfoTip label="How this chart is built">
                     <p>
-                      Each slice counts jobs <strong>created</strong> in that window,
+                      Each bar counts jobs <strong>created</strong> on that day,
                       grouped by <strong>current</strong> status using the same rules
                       as the rest of the dashboard (completed, failed, or queued).
                     </p>
                     <p>
-                      Optional detail: buckets align to 15-minute boundaries in the
-                      database time zone.
+                      Optional detail: buckets align to calendar-day boundaries in
+                      the database time zone.
                     </p>
                   </InfoTip>
                 </>
@@ -489,9 +488,9 @@ export function OperationsDashboard() {
               <ChartAreaShimmer />
             ) : (
               <ChartContainer
-                id="jobs-4h"
+                id="jobs-7d"
                 config={jobsStatusChartConfig}
-                className="aspect-auto min-h-[280px] w-full [&_.recharts-curve.recharts-tooltip-cursor]:stroke-border"
+                className="h-[320px] w-full [&_.recharts-curve.recharts-tooltip-cursor]:stroke-border"
               >
                 <AreaChart
                   accessibilityLayer

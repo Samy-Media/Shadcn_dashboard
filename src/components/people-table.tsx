@@ -1,23 +1,20 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/router";
 import { format, formatDistanceToNow } from "date-fns";
 import {
   ArrowDownAZ,
   Bot,
+  Eye,
   Mail,
   RefreshCw,
   Search,
   UserCircle2,
   Users,
-  ExternalLink,
   Hash,
   Building2,
   Clock,
   Filter,
-  Globe2,
-  LayoutGrid,
   SlidersHorizontal,
 } from "lucide-react";
 
@@ -55,8 +52,16 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { InfoTip } from "@/components/info-tip";
 import { PageHeading } from "@/components/page-heading";
+import { PeopleUserDetail } from "@/components/people-user-detail";
 import { cn } from "@/lib/utils";
 
 export type UserRecord = {
@@ -77,34 +82,17 @@ const PAGE_SIZE = 30;
 
 type Tri = "any" | "yes" | "no";
 
-/** SafeServ enrollment filter (public.users.safeserv_active). */
-export type PeopleSafeservFilter = "all" | "safeserv" | "not_safeserv";
+type PeopleAppView = "all" | "safeserv" | "digispace";
 
-const SAFESERV_FILTER_PILLS: {
-  id: PeopleSafeservFilter;
+const APP_VIEW_OPTIONS: {
+  id: PeopleAppView;
   label: string;
   hint: string;
 }[] = [
-  { id: "all", label: "All users", hint: "Everyone (no SafeServ filter)" },
-  { id: "safeserv", label: "SafeServ", hint: "safeserv_active is true" },
-  { id: "not_safeserv", label: "Not on SafeServ", hint: "Inactive or not enrolled" },
+  { id: "all", label: "All", hint: "Show everyone in the directory" },
+  { id: "safeserv", label: "SafeServ", hint: "Show users active on SafeServ" },
+  { id: "digispace", label: "Digispace", hint: "Show users active on Digispace" },
 ];
-
-/** Digispace filter (public.users.digispace_active) — same shape as SafeServ row. */
-export type PeopleDigispaceFilter = "all" | "digispace" | "not_digispace";
-
-const DIGISPACE_FILTER_PILLS: {
-  id: PeopleDigispaceFilter;
-  label: string;
-  hint: string;
-}[] = [
-  { id: "all", label: "All users", hint: "Everyone (no Digispace filter)" },
-  { id: "digispace", label: "Digispace", hint: "digispace_active is true" },
-  { id: "not_digispace", label: "Not on Digispace", hint: "Inactive or not enrolled" },
-];
-
-/** @deprecated use PeopleSafeservFilter */
-export type PeopleAppFilter = PeopleSafeservFilter;
 
 function buildUsersQuery(params: {
   limit: number;
@@ -113,8 +101,8 @@ function buildUsersQuery(params: {
   slackUserId: string;
   requesterId: string;
   hasEmail: Tri;
-  safeservFilter: PeopleSafeservFilter;
-  digispaceFilter: PeopleDigispaceFilter;
+  safeservFilter: "all" | "safeserv";
+  digispaceFilter: "all" | "digispace";
   agentFilter: Tri;
   sort: UserListSort;
 }): string {
@@ -128,9 +116,7 @@ function buildUsersQuery(params: {
   if (params.hasEmail === "yes") p.set("has_email", "yes");
   if (params.hasEmail === "no") p.set("has_email", "no");
   if (params.safeservFilter === "safeserv") p.set("safeserv_active", "yes");
-  if (params.safeservFilter === "not_safeserv") p.set("safeserv_active", "no");
   if (params.digispaceFilter === "digispace") p.set("digispace_active", "yes");
-  if (params.digispaceFilter === "not_digispace") p.set("digispace_active", "no");
   if (params.agentFilter === "yes") p.set("is_agent", "yes");
   if (params.agentFilter === "no") p.set("is_agent", "no");
   return p.toString();
@@ -159,15 +145,15 @@ export function ProductTable() {
   const [qDebounced, setQDebounced] = React.useState("");
   const [slackUserIdFilter, setSlackUserIdFilter] = React.useState("");
   const [requesterIdFilter, setRequesterIdFilter] = React.useState("");
+  const [appView, setAppView] = React.useState<PeopleAppView>("all");
   const [hasEmail, setHasEmail] = React.useState<Tri>("any");
-  const [safeservFilter, setSafeservFilter] =
-    React.useState<PeopleSafeservFilter>("all");
-  const [digispaceFilter, setDigispaceFilter] =
-    React.useState<PeopleDigispaceFilter>("all");
   const [agentFilter, setAgentFilter] = React.useState<Tri>("any");
   const [sort, setSort] = React.useState<UserListSort>("updated_at_desc");
-
-  const router = useRouter();
+  const [detailOpen, setDetailOpen] = React.useState(false);
+  const [selectedUser, setSelectedUser] = React.useState<{
+    slackUserId: string;
+    slackTeamId: string;
+  } | null>(null);
 
   React.useEffect(() => {
     const t = window.setTimeout(() => setQDebounced(q), 380);
@@ -180,12 +166,14 @@ export function ProductTable() {
     qDebounced,
     slackUserIdFilter,
     requesterIdFilter,
+    appView,
     hasEmail,
-    safeservFilter,
-    digispaceFilter,
     agentFilter,
     sort,
   ]);
+
+  const safeservFilter = appView === "safeserv" ? "safeserv" : "all";
+  const digispaceFilter = appView === "digispace" ? "digispace" : "all";
 
   const fetchUsers = React.useCallback(
     async (isRefresh = false) => {
@@ -242,12 +230,19 @@ export function ProductTable() {
     setQDebounced("");
     setSlackUserIdFilter("");
     setRequesterIdFilter("");
+    setAppView("all");
     setHasEmail("any");
-    setSafeservFilter("all");
-    setDigispaceFilter("all");
     setAgentFilter("any");
     setSort("updated_at_desc");
   };
+
+  const openDetail = React.useCallback((user: UserRecord) => {
+    setSelectedUser({
+      slackUserId: user.slack_user_id,
+      slackTeamId: user.slack_team_id,
+    });
+    setDetailOpen(true);
+  }, []);
 
   const start = total === 0 ? 0 : page * PAGE_SIZE + 1;
   const end = Math.min((page + 1) * PAGE_SIZE, total);
@@ -263,74 +258,41 @@ export function ProductTable() {
             <span>Search and open people in your directory.</span>
             <InfoTip label="About this data">
               <p>
-                Stored in <code>public.users</code>. SafeServ and Digispace rows
-                filter <code>safeserv_active</code> and <code>digispace_active</code>{" "}
-                independently (same pill pattern for each).
+                Stored in <code>public.users</code>. Use the app switcher to slide
+                between all users, SafeServ users, and Digispace users.
               </p>
             </InfoTip>
           </>
         }
       />
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between sm:gap-4">
-        <div className="flex min-w-0 flex-1 flex-col gap-3">
-          <div className="flex min-w-0 flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-3">
-            <span className="text-muted-foreground flex w-[7.5rem] shrink-0 items-center gap-1.5 text-xs font-medium">
-              <LayoutGrid className="size-3.5 opacity-70" aria-hidden />
-              SafeServ
-            </span>
-            <div className="flex min-w-0 flex-1 flex-wrap gap-1.5 rounded-xl border border-border/60 bg-muted/30 p-1">
-              {SAFESERV_FILTER_PILLS.map(({ id, label, hint }) => (
-                <Tooltip key={id}>
-                  <TooltipTrigger asChild>
-                    <Button
-                      type="button"
-                      variant={safeservFilter === id ? "default" : "ghost"}
-                      size="sm"
-                      className="h-8 rounded-lg px-3 text-xs"
-                      onClick={() => {
-                        setSafeservFilter(id);
-                        setPage(0);
-                      }}
-                    >
-                      {label}
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom" className="max-w-[220px] text-xs">
-                    {hint}
-                  </TooltipContent>
-                </Tooltip>
-              ))}
-            </div>
-          </div>
-          <div className="flex min-w-0 flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-3">
-            <span className="text-muted-foreground flex w-[7.5rem] shrink-0 items-center gap-1.5 text-xs font-medium">
-              <Globe2 className="size-3.5 opacity-70" aria-hidden />
-              Digispace
-            </span>
-            <div className="flex min-w-0 flex-1 flex-wrap gap-1.5 rounded-xl border border-border/60 bg-muted/30 p-1">
-              {DIGISPACE_FILTER_PILLS.map(({ id, label, hint }) => (
-                <Tooltip key={id}>
-                  <TooltipTrigger asChild>
-                    <Button
-                      type="button"
-                      variant={digispaceFilter === id ? "default" : "ghost"}
-                      size="sm"
-                      className="h-8 rounded-lg px-3 text-xs"
-                      onClick={() => {
-                        setDigispaceFilter(id);
-                        setPage(0);
-                      }}
-                    >
-                      {label}
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom" className="max-w-[220px] text-xs">
-                    {hint}
-                  </TooltipContent>
-                </Tooltip>
-              ))}
-            </div>
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-4">
+        <div className="min-w-0 flex-1">
+          <div className="inline-flex min-w-0 max-w-full items-center rounded-2xl border border-border/60 bg-muted/30 p-1">
+            {APP_VIEW_OPTIONS.map(({ id, label, hint }) => (
+              <Tooltip key={id}>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    variant={appView === id ? "default" : "ghost"}
+                    size="sm"
+                    className={cn(
+                      "h-10 rounded-xl px-4 text-sm font-medium",
+                      appView !== id && "text-muted-foreground"
+                    )}
+                    onClick={() => {
+                      setAppView(id);
+                      setPage(0);
+                    }}
+                  >
+                    {label}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="max-w-[220px] text-xs">
+                  {hint}
+                </TooltipContent>
+              </Tooltip>
+            ))}
           </div>
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-2 sm:pt-0">
@@ -338,7 +300,7 @@ export function ProductTable() {
             type="button"
             variant="outline"
             size="sm"
-            className="h-9 rounded-lg"
+            className="h-10 rounded-xl px-4"
             onClick={() => void fetchUsers(true)}
             disabled={loading || refreshing}
           >
@@ -351,7 +313,7 @@ export function ProductTable() {
             type="button"
             variant="ghost"
             size="sm"
-            className="h-9 rounded-lg text-muted-foreground"
+            className="h-10 rounded-xl px-4 text-muted-foreground"
             onClick={resetFilters}
           >
             Reset filters
@@ -746,14 +708,10 @@ export function ProductTable() {
                           variant="outline"
                           size="sm"
                           className="rounded-lg"
-                          onClick={() =>
-                            void router.push(
-                              `/dashboard/people/${encodeURIComponent(u.slack_user_id)}/${encodeURIComponent(u.slack_team_id)}`
-                            )
-                          }
+                          onClick={() => openDetail(u)}
                         >
-                          <ExternalLink className="mr-1.5 size-3.5" />
-                          Open
+                          <Eye className="mr-1.5 size-3.5" />
+                          View
                         </Button>
                       </TableCell>
                     </TableRow>
@@ -795,6 +753,40 @@ export function ProductTable() {
           </div>
         </div>
       </div>
+
+      <Sheet open={detailOpen} onOpenChange={setDetailOpen}>
+        <SheetContent
+          side="right"
+          className="w-full overflow-y-auto border-l border-border/60 bg-background sm:max-w-2xl"
+        >
+          <SheetHeader className="border-b border-border/60 px-6 py-5">
+            <SheetTitle>Person detail</SheetTitle>
+            <SheetDescription>
+              Review and edit user fields without leaving the People page.
+            </SheetDescription>
+          </SheetHeader>
+          <div className="px-6 py-5">
+            {selectedUser ? (
+              <PeopleUserDetail
+                slackUserId={selectedUser.slackUserId}
+                slackTeamId={selectedUser.slackTeamId}
+                embedded
+                onClose={() => setDetailOpen(false)}
+                onSaved={(updatedUser) =>
+                  setUsers((current) =>
+                    current.map((user) =>
+                      user.slack_user_id === updatedUser.slack_user_id &&
+                      user.slack_team_id === updatedUser.slack_team_id
+                        ? updatedUser
+                        : user
+                    )
+                  )
+                }
+              />
+            ) : null}
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

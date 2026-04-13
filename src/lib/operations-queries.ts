@@ -46,8 +46,8 @@ export type SlackInstallationRow = {
   updated_at: string | null;
 };
 
-/** 15-minute buckets over the last 4 hours; counts jobs by creation time and current status. */
-export type JobStatusBucket4h = {
+/** Daily buckets over the last 7 days; counts jobs by creation time and current status. */
+export type JobStatusBucket7d = {
   bucket: string;
   completed: number;
   failed: number;
@@ -64,15 +64,14 @@ export type DashboardStats = {
     failed: number;
     completed: number;
   };
-  jobsLast4h: JobStatusBucket4h[];
+  jobsLast7d: JobStatusBucket7d[];
 };
 
-const JOB_STATUS_BUCKET_SECONDS = 15 * 60;
-const JOB_STATUS_RANGE_HOURS = 4;
+const JOB_STATUS_RANGE_DAYS = 7;
 
-/** Jobs created in each 15-minute window (last 4h), grouped by the same status rules as dashboard totals. */
-export async function getJobsStatusBucketsLast4Hours(): Promise<
-  JobStatusBucket4h[]
+/** Jobs created each day over the last 7 days, grouped by the same status rules as dashboard totals. */
+export async function getJobsStatusBucketsLast7Days(): Promise<
+  JobStatusBucket7d[]
 > {
   const { rows } = await pool.query<{
     bucket_at: Date;
@@ -81,7 +80,7 @@ export async function getJobsStatusBucketsLast4Hours(): Promise<
     queued: string;
   }>(
     `SELECT
-       to_timestamp(floor(extract(epoch from created_at) / $1) * $1) AS bucket_at,
+       date_trunc('day', created_at) AS bucket_at,
        COUNT(*) FILTER (
          WHERE LOWER(TRIM(status)) IN (
            'completed', 'success', 'succeeded', 'complete'
@@ -99,39 +98,46 @@ export async function getJobsStatusBucketsLast4Hours(): Promise<
          )
        )::text AS queued
      FROM public.jobs
-     WHERE created_at >= NOW() - INTERVAL '4 hours'
+     WHERE created_at >= date_trunc('day', NOW()) - INTERVAL '6 days'
        AND created_at IS NOT NULL
      GROUP BY 1
-     ORDER BY 1`,
-    [JOB_STATUS_BUCKET_SECONDS]
+     ORDER BY 1`
   );
 
-  const bucketMs = JOB_STATUS_BUCKET_SECONDS * 1000;
-  const numBuckets = (JOB_STATUS_RANGE_HOURS * 60) / 15;
   const rowMap = new Map<
     string,
     { completed: number; failed: number; queued: number }
   >();
 
   for (const r of rows) {
-    const epoch = new Date(r.bucket_at).getTime();
-    const aligned = Math.floor(epoch / bucketMs) * bucketMs;
-    rowMap.set(String(aligned), {
+    const bucketDate = new Date(r.bucket_at);
+    const aligned = new Date(
+      bucketDate.getFullYear(),
+      bucketDate.getMonth(),
+      bucketDate.getDate()
+    );
+    rowMap.set(aligned.toISOString(), {
       completed: Number(r.completed ?? 0),
       failed: Number(r.failed ?? 0),
       queued: Number(r.queued ?? 0),
     });
   }
 
-  const now = Date.now();
-  const endBucket = Math.floor(now / bucketMs) * bucketMs;
-  const out: JobStatusBucket4h[] = [];
+  const today = new Date();
+  const endBucket = new Date(
+    today.getFullYear(),
+    today.getMonth(),
+    today.getDate()
+  );
+  const out: JobStatusBucket7d[] = [];
 
-  for (let i = numBuckets - 1; i >= 0; i--) {
-    const t = endBucket - i * bucketMs;
-    const m = rowMap.get(String(t));
+  for (let i = JOB_STATUS_RANGE_DAYS - 1; i >= 0; i--) {
+    const t = new Date(endBucket);
+    t.setDate(endBucket.getDate() - i);
+    const key = t.toISOString();
+    const m = rowMap.get(key);
     out.push({
-      bucket: new Date(t).toISOString(),
+      bucket: key,
       completed: m?.completed ?? 0,
       failed: m?.failed ?? 0,
       queued: m?.queued ?? 0,
@@ -1157,7 +1163,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
   );
 
   const row = rows[0];
-  const jobsLast4h = await getJobsStatusBucketsLast4Hours();
+  const jobsLast7d = await getJobsStatusBucketsLast7Days();
 
   return {
     usersOnboarded: Number(row?.users_c ?? 0),
@@ -1169,6 +1175,6 @@ export async function getDashboardStats(): Promise<DashboardStats> {
       failed: Number(row?.failed ?? 0),
       completed: Number(row?.completed ?? 0),
     },
-    jobsLast4h,
+    jobsLast7d,
   };
 }

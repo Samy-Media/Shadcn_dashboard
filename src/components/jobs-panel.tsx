@@ -8,6 +8,7 @@ import {
   Filter,
   Hash,
   Layers,
+  Eye,
   RefreshCw,
   Search,
   SlidersHorizontal,
@@ -298,8 +299,8 @@ export function JobsPanel() {
         }
       />
 
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="flex flex-wrap gap-1.5 rounded-xl border border-border/60 bg-muted/30 p-1">
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-4">
+        <div className="inline-flex min-w-0 max-w-full items-center rounded-2xl border border-border/60 bg-muted/30 p-1">
           {(
             [
               ["all", "All"],
@@ -313,7 +314,7 @@ export function JobsPanel() {
               type="button"
               variant={statusGroup === id && !statusPick.length ? "default" : "ghost"}
               size="sm"
-              className="h-8 rounded-lg px-3 text-xs"
+              className="h-10 rounded-xl px-4 text-sm font-medium"
               onClick={() => {
                 setStatusGroup(id);
                 setStatusPick([]);
@@ -324,12 +325,12 @@ export function JobsPanel() {
             </Button>
           ))}
         </div>
-        <div className="ml-auto flex flex-wrap items-center gap-2">
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
           <Button
             type="button"
             variant="outline"
             size="sm"
-            className="rounded-lg"
+            className="h-10 rounded-xl px-4"
             onClick={() => void fetchJobs()}
             disabled={loading}
           >
@@ -340,7 +341,7 @@ export function JobsPanel() {
             type="button"
             variant="ghost"
             size="sm"
-            className="rounded-lg text-muted-foreground"
+            className="h-10 rounded-xl px-4 text-muted-foreground"
             onClick={resetFilters}
           >
             Reset filters
@@ -580,8 +581,8 @@ export function JobsPanel() {
                   <TableHead className="min-w-[100px] font-semibold">Bull id</TableHead>
                   <TableHead className="min-w-[120px] font-semibold">Slack users</TableHead>
                   <TableHead className="min-w-[130px] font-semibold">Created</TableHead>
-                  <TableHead className="w-[88px] pr-4 text-right font-semibold">
-                    View
+                  <TableHead className="w-[100px] pr-4 text-right font-semibold">
+                    Actions
                   </TableHead>
                 </TableRow>
               </TableHeader>
@@ -673,7 +674,8 @@ export function JobsPanel() {
                             openDetail(j.id);
                           }}
                         >
-                          Detail
+                          <Eye className="mr-1 size-3.5" />
+                          View
                         </Button>
                       </TableCell>
                     </TableRow>

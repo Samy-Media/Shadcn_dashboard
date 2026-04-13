@@ -6,10 +6,12 @@ import {
   ArrowDownAZ,
   Clock3,
   Eye,
+  Filter,
   KeyRound,
   Loader2,
   RefreshCw,
   Search,
+  SlidersHorizontal,
   Trash2,
 } from "lucide-react";
 
@@ -17,6 +19,11 @@ import { InfoTip } from "@/components/info-tip";
 import { PageHeading } from "@/components/page-heading";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import {
   Dialog,
   DialogContent,
@@ -286,14 +293,16 @@ export function SessionsPanel() {
         }
       />
 
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-4">
+        <div className="flex flex-wrap items-center gap-2">
         <div className="rounded-xl border border-border/60 bg-muted/25 px-3 py-1.5 text-xs text-muted-foreground">
           Total in Redis: <span className="font-semibold text-foreground">{total}</span>
         </div>
         <div className="rounded-xl border border-border/60 bg-muted/25 px-3 py-1.5 text-xs text-muted-foreground">
           Loaded: <span className="font-semibold text-foreground">{returned}</span> (limit 500)
         </div>
-        <div className="ml-auto flex gap-2">
+        </div>
+        <div className="flex shrink-0 gap-2">
           <Button
             type="button"
             variant="outline"
@@ -309,8 +318,8 @@ export function SessionsPanel() {
       </div>
 
       <div className="rounded-2xl border border-border/60 bg-card/40 p-4 shadow-sm">
-        <div className="grid gap-3 lg:grid-cols-5">
-          <div className="relative lg:col-span-2">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end">
+          <div className="relative min-w-0 flex-1">
             <Search className="text-muted-foreground absolute left-3 top-1/2 size-4 -translate-y-1/2" />
             <Input
               placeholder="Search team, user, email, key…"
@@ -319,43 +328,76 @@ export function SessionsPanel() {
               className="h-10 rounded-xl border-border/60 pl-9"
             />
           </div>
-          <Input
-            placeholder="Team ID"
-            value={teamIdFilter}
-            onChange={(e) => setTeamIdFilter(e.target.value)}
-            className="h-10 rounded-xl border-border/60 font-mono text-sm"
-          />
-          <Input
-            placeholder="User ID"
-            value={userIdFilter}
-            onChange={(e) => setUserIdFilter(e.target.value)}
-            className="h-10 rounded-xl border-border/60 font-mono text-sm"
-          />
-          <div className="flex gap-2">
-            <Select value={hasToken} onValueChange={(v) => setHasToken(v as Tri)}>
-              <SelectTrigger className="h-10 w-[140px] rounded-xl">
-                <SelectValue placeholder="Token" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="any">Any token</SelectItem>
-                <SelectItem value="yes">Has token</SelectItem>
-                <SelectItem value="no">No token</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={sort} onValueChange={(v) => setSort(v as SortKey)}>
-              <SelectTrigger className="h-10 w-[190px] rounded-xl">
-                <ArrowDownAZ className="mr-1 size-3.5 opacity-60" />
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ttl_desc">TTL · highest</SelectItem>
-                <SelectItem value="ttl_asc">TTL · lowest</SelectItem>
-                <SelectItem value="team_asc">Team · A-Z</SelectItem>
-                <SelectItem value="team_desc">Team · Z-A</SelectItem>
-              </SelectContent>
-            </Select>
+          <div className="flex flex-wrap gap-2">
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Token</Label>
+              <Select value={hasToken} onValueChange={(v) => setHasToken(v as Tri)}>
+                <SelectTrigger className="h-10 w-[150px] rounded-xl">
+                  <SelectValue placeholder="Token" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="any">Any token</SelectItem>
+                  <SelectItem value="yes">Has token</SelectItem>
+                  <SelectItem value="no">No token</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Sort</Label>
+              <Select value={sort} onValueChange={(v) => setSort(v as SortKey)}>
+                <SelectTrigger className="h-10 w-[220px] rounded-xl">
+                  <ArrowDownAZ className="mr-1 size-3.5 opacity-60" />
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ttl_desc">TTL · highest</SelectItem>
+                  <SelectItem value="ttl_asc">TTL · lowest</SelectItem>
+                  <SelectItem value="team_asc">Team · A-Z</SelectItem>
+                  <SelectItem value="team_desc">Team · Z-A</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </div>
+
+        <Collapsible className="mt-4">
+          <CollapsibleTrigger asChild>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="w-full justify-between rounded-xl border-dashed"
+            >
+              <span className="flex items-center gap-2">
+                <SlidersHorizontal className="size-4" />
+                Advanced filters
+              </span>
+              <Filter className="size-4 opacity-60" />
+            </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="mt-4 space-y-4 data-[state=closed]:animate-none">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Team ID</Label>
+                <Input
+                  placeholder="Substring match"
+                  value={teamIdFilter}
+                  onChange={(e) => setTeamIdFilter(e.target.value)}
+                  className="h-9 rounded-lg font-mono text-sm"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">User ID</Label>
+                <Input
+                  placeholder="Substring match"
+                  value={userIdFilter}
+                  onChange={(e) => setUserIdFilter(e.target.value)}
+                  className="h-9 rounded-lg font-mono text-sm"
+                />
+              </div>
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
       </div>
 
       <div className="relative overflow-hidden rounded-2xl border border-border/60 bg-card/40 shadow-sm">

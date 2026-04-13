@@ -6,10 +6,12 @@ import {
   ArrowDownAZ,
   Clock,
   Eye,
+  Filter,
   Globe2,
   Hash,
   RefreshCw,
   Search,
+  SlidersHorizontal,
 } from "lucide-react";
 
 import type {
@@ -20,6 +22,11 @@ import { InfoTip } from "@/components/info-tip";
 import { PageHeading } from "@/components/page-heading";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
@@ -262,7 +269,7 @@ export function AtlasJobsPanel() {
         }
       />
 
-      <div className="flex flex-wrap items-center justify-end gap-2">
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end sm:gap-4">
         <Button
           type="button"
           variant="outline"
@@ -288,8 +295,8 @@ export function AtlasJobsPanel() {
       </div>
 
       <div className="rounded-2xl border border-border/60 bg-card/40 p-4 shadow-sm">
-        <div className="grid gap-3 lg:grid-cols-6">
-          <div className="relative lg:col-span-2">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end">
+          <div className="relative min-w-0 flex-1">
             <Search className="text-muted-foreground absolute left-3 top-1/2 size-4 -translate-y-1/2" />
             <Input
               placeholder="Search Slack user id, status, Bull id, error, UUID…"
@@ -298,72 +305,108 @@ export function AtlasJobsPanel() {
               className="h-10 rounded-xl border-border/60 pl-9"
             />
           </div>
-          <Input
-            placeholder="Slack user ID (exact)"
-            value={slackUserId}
-            onChange={(e) => setSlackUserId(e.target.value)}
-            className="h-10 rounded-xl border-border/60 font-mono text-sm"
-          />
-          <Input
-            placeholder="Bull job ID contains"
-            value={bullJobId}
-            onChange={(e) => setBullJobId(e.target.value)}
-            className="h-10 rounded-xl border-border/60 font-mono text-sm"
-          />
-          <Select
-            value={statusGroup}
-            onValueChange={(v) => {
-              setStatusGroup(v as StatusGroup);
-              setPage(0);
-            }}
-          >
-            <SelectTrigger className="h-10 rounded-xl">
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All statuses</SelectItem>
-              <SelectItem value="queued">In flight</SelectItem>
-              <SelectItem value="completed">Succeeded</SelectItem>
-              <SelectItem value="failed">Failed</SelectItem>
-            </SelectContent>
-          </Select>
-          <div className="flex gap-2">
-            <Select
-              value={hasError}
-              onValueChange={(v) => {
-                setHasError(v as "any" | "yes" | "no");
-                setPage(0);
-              }}
-            >
-              <SelectTrigger className="h-10 w-[130px] rounded-xl">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="any">Any error</SelectItem>
-                <SelectItem value="yes">Has error</SelectItem>
-                <SelectItem value="no">No error</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select
-              value={sort}
-              onValueChange={(v) => {
-                setSort(v as SlackAtlasSyncJobSort);
-                setPage(0);
-              }}
-            >
-              <SelectTrigger className="h-10 min-w-[200px] rounded-xl">
-                <ArrowDownAZ className="mr-1 size-3.5 opacity-60" />
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="created_at_desc">Created · newest</SelectItem>
-                <SelectItem value="created_at_asc">Created · oldest</SelectItem>
-                <SelectItem value="updated_at_desc">Updated · newest</SelectItem>
-                <SelectItem value="updated_at_asc">Updated · oldest</SelectItem>
-              </SelectContent>
-            </Select>
+          <div className="flex flex-wrap gap-2">
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Status</Label>
+              <Select
+                value={statusGroup}
+                onValueChange={(v) => {
+                  setStatusGroup(v as StatusGroup);
+                  setPage(0);
+                }}
+              >
+                <SelectTrigger className="h-10 w-[150px] rounded-xl">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All statuses</SelectItem>
+                  <SelectItem value="queued">In flight</SelectItem>
+                  <SelectItem value="completed">Succeeded</SelectItem>
+                  <SelectItem value="failed">Failed</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Errors</Label>
+              <Select
+                value={hasError}
+                onValueChange={(v) => {
+                  setHasError(v as "any" | "yes" | "no");
+                  setPage(0);
+                }}
+              >
+                <SelectTrigger className="h-10 w-[130px] rounded-xl">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="any">Any error</SelectItem>
+                  <SelectItem value="yes">Has error</SelectItem>
+                  <SelectItem value="no">No error</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Sort</Label>
+              <Select
+                value={sort}
+                onValueChange={(v) => {
+                  setSort(v as SlackAtlasSyncJobSort);
+                  setPage(0);
+                }}
+              >
+                <SelectTrigger className="h-10 w-[220px] rounded-xl">
+                  <ArrowDownAZ className="mr-1 size-3.5 opacity-60" />
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="created_at_desc">Created · newest</SelectItem>
+                  <SelectItem value="created_at_asc">Created · oldest</SelectItem>
+                  <SelectItem value="updated_at_desc">Updated · newest</SelectItem>
+                  <SelectItem value="updated_at_asc">Updated · oldest</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </div>
+
+        <Collapsible className="mt-4">
+          <CollapsibleTrigger asChild>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="w-full justify-between rounded-xl border-dashed"
+            >
+              <span className="flex items-center gap-2">
+                <SlidersHorizontal className="size-4" />
+                Advanced filters
+              </span>
+              <Filter className="size-4 opacity-60" />
+            </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="mt-4 space-y-4 data-[state=closed]:animate-none">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Slack user ID (exact)</Label>
+                <Input
+                  placeholder="U..."
+                  value={slackUserId}
+                  onChange={(e) => setSlackUserId(e.target.value)}
+                  className="h-9 rounded-lg font-mono text-sm"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Bull job ID contains</Label>
+                <Input
+                  placeholder="Substring match"
+                  value={bullJobId}
+                  onChange={(e) => setBullJobId(e.target.value)}
+                  className="h-9 rounded-lg font-mono text-sm"
+                />
+              </div>
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
       </div>
 
       <div className="relative overflow-hidden rounded-2xl border border-border/60 bg-card/40 shadow-sm">

@@ -13,6 +13,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { cn } from "@/lib/utils";
 type FormState = {
   email: string;
   requester_id: string;
@@ -32,9 +33,15 @@ function userToForm(u: UserRecord): FormState {
 export function PeopleUserDetail({
   slackUserId,
   slackTeamId,
+  embedded = false,
+  onClose,
+  onSaved,
 }: {
   slackUserId: string;
   slackTeamId: string;
+  embedded?: boolean;
+  onClose?: () => void;
+  onSaved?: (user: UserRecord) => void;
 }) {
   const router = useRouter();
   const [user, setUser] = React.useState<UserRecord | null>(null);
@@ -123,6 +130,7 @@ export function PeopleUserDetail({
       }
       setUser(json.data);
       setForm(userToForm(json.data));
+      onSaved?.(json.data);
       setSavedOk(true);
       window.setTimeout(() => setSavedOk(false), 2500);
     } catch (e) {
@@ -180,23 +188,43 @@ export function PeopleUserDetail({
     return (
       <div className="space-y-4">
         <p className="text-destructive text-sm">{loadError ?? "Not found"}</p>
-        <Button type="button" variant="outline" onClick={() => void router.push("/dashboard?tab=people")}>
-          <ArrowLeft className="mr-2 size-4" />
-          Back to People
-        </Button>
+        {embedded ? (
+          <Button type="button" variant="outline" onClick={onClose}>
+            Close
+          </Button>
+        ) : (
+          <Button type="button" variant="outline" onClick={() => void router.push("/dashboard?tab=people")}>
+            <ArrowLeft className="mr-2 size-4" />
+            Back to People
+          </Button>
+        )}
       </div>
     );
   }
 
   return (
-    <div className="mx-auto max-w-2xl space-y-8 pb-12">
+    <div
+      className={cn(
+        "space-y-8 pb-12",
+        embedded ? "max-w-none" : "mx-auto max-w-2xl"
+      )}
+    >
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <Button type="button" variant="ghost" size="sm" className="-ml-2 gap-2" asChild>
-          <Link href="/dashboard?tab=people">
-            <ArrowLeft className="size-4" />
-            People
-          </Link>
-        </Button>
+        {embedded ? (
+          <div className="min-w-0">
+            <p className="text-sm font-semibold">User details</p>
+            <p className="text-muted-foreground text-xs">
+              Edit this person directly from the People table.
+            </p>
+          </div>
+        ) : (
+          <Button type="button" variant="ghost" size="sm" className="-ml-2 gap-2" asChild>
+            <Link href="/dashboard?tab=people">
+              <ArrowLeft className="size-4" />
+              People
+            </Link>
+          </Button>
+        )}
         <Button
           type="button"
           disabled={saving || !dirty}
