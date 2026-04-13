@@ -3,6 +3,7 @@
 import * as React from "react";
 import { format, formatDistanceToNow } from "date-fns";
 import {
+  AppWindow,
   Bot,
   Building2,
   Clock,
@@ -115,11 +116,14 @@ export function InstallationsPanel() {
         title="Installations"
         description={
           <>
-            <span>See every workspace where your Slack app is installed.</span>
+            <span>
+              See every Slack app installation (workspace + app name).
+            </span>
             <InfoTip label="About this data">
               <p>
-                Each row is from <code>public.slack_installation</code>: workspace,
-                enterprise, bot, OAuth scopes, and install time.
+                Each row is from <code>public.slack_installation</code> (unique by
+                workspace and <code>app_name</code>): app identity, enterprise, bot,
+                OAuth scopes, and install time.
               </p>
             </InfoTip>
           </>
@@ -152,7 +156,7 @@ export function InstallationsPanel() {
             <span className="text-foreground font-medium">
               {loading ? "…" : rows.length}
             </span>{" "}
-            workspace{rows.length === 1 ? "" : "s"}
+            installation{rows.length === 1 ? "" : "s"}
           </span>
         </div>
         <div className="relative px-2 pb-2 pt-2 sm:px-3">
@@ -160,8 +164,8 @@ export function InstallationsPanel() {
             <Table className="table-fixed w-full min-w-[860px]">
               <TableHeader>
                 <TableRow className="border-muted-foreground/15 hover:bg-transparent">
-                  <TableHead className="w-[15%] font-semibold">Team</TableHead>
-                  <TableHead className="w-[11%] font-semibold">Team ID</TableHead>
+                  <TableHead className="w-[15%] font-semibold">App name</TableHead>
+                  <TableHead className="w-[11%] font-semibold">App ID</TableHead>
                   <TableHead className="w-[13%] font-semibold">
                     Enterprise
                   </TableHead>
@@ -205,25 +209,26 @@ export function InstallationsPanel() {
                 ) : (
                   rows.map((r) => {
                     const nScopes = scopeCount(r.scopes);
+                    const rowKey = `${r.slack_team_id}\0${r.app_name ?? ""}`;
                     return (
                       <TableRow
-                        key={r.slack_team_id}
+                        key={rowKey}
                         className="border-muted-foreground/10 transition-colors hover:bg-muted/50"
                       >
                         <TableCell className="max-w-0 align-middle">
                           <span className="flex min-w-0 items-center gap-2 font-medium">
-                            <Building2 className="text-muted-foreground size-3.5 shrink-0" />
+                            <AppWindow className="text-muted-foreground size-3.5 shrink-0" />
                             <span className="truncate text-sm">
-                              {r.team_name?.trim() || "—"}
+                              {r.app_name?.trim() || "—"}
                             </span>
                           </span>
                         </TableCell>
                         <TableCell className="max-w-0 align-middle">
                           <code
                             className="block truncate rounded-md bg-muted px-2 py-0.5 font-mono text-xs"
-                            title={r.slack_team_id}
+                            title={r.app_id ?? undefined}
                           >
-                            {r.slack_team_id}
+                            {r.app_id?.trim() || "—"}
                           </code>
                         </TableCell>
                         <TableCell className="max-w-0 align-middle">
@@ -388,12 +393,12 @@ export function InstallationsPanel() {
                   Installation
                 </SheetTitle>
                 <SheetDescription className="text-base">
-                  {selected?.team_name?.trim() || (
-                    <span className="text-muted-foreground">Workspace</span>
+                  {selected?.app_name?.trim() || (
+                    <span className="text-muted-foreground">Slack app</span>
                   )}
                   {selected ? (
                     <code className="mt-1 block truncate rounded-md bg-muted px-2 py-0.5 font-mono text-sm text-foreground">
-                      {selected.slack_team_id}
+                      {selected.app_id?.trim() || "—"}
                     </code>
                   ) : null}
                 </SheetDescription>
@@ -404,6 +409,24 @@ export function InstallationsPanel() {
           <div className="flex flex-1 flex-col gap-6 px-6 py-6">
             {selected ? (
               <>
+                <div className="space-y-4">
+                  <h3 className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">
+                    Slack app
+                  </h3>
+                  <div className="space-y-3 rounded-xl border bg-card/80 p-4 shadow-sm">
+                    <DetailRow
+                      label="App name"
+                      value={selected.app_name?.trim() || "—"}
+                    />
+                    <Separator />
+                    <DetailRow
+                      label="App ID"
+                      value={selected.app_id?.trim() || "—"}
+                      mono
+                    />
+                  </div>
+                </div>
+
                 <div className="space-y-4">
                   <h3 className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">
                     Workspace
@@ -442,7 +465,7 @@ export function InstallationsPanel() {
 
                 <div className="space-y-4">
                   <h3 className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">
-                    Slack app
+                    Bot & installer
                   </h3>
                   <div className="space-y-3 rounded-xl border bg-card/80 p-4 shadow-sm">
                     <DetailRow
