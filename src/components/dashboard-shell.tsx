@@ -49,7 +49,7 @@ const NAV: {
 }[] = [
   { id: "Dashboard", label: "Overview", description: "Operations summary", icon: PieChart },
   { id: "People", label: "People", description: "Directory and members", icon: Users },
-  { id: "Jobs", label: "Jobs", description: "Queues and status", icon: Layers },
+  { id: "Jobs", label: "Ticket Jobs", description: "Queues and status", icon: Layers },
   { id: "Messages", label: "Messages", description: "Slack message flows", icon: MessageSquare },
   { id: "Atlas", label: "Atlas", description: "Sync activity", icon: Globe2 },
   { id: "Sessions", label: "Sessions", description: "Access and tokens", icon: KeyRound },

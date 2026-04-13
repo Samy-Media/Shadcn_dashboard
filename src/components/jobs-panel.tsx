@@ -285,14 +285,14 @@ export function JobsPanel() {
     <div className="space-y-6">
       <PageHeading
         icon={Layers}
-        title="Jobs"
+        title="Ticket Jobs"
         description={
           <>
-            <span>Browse background jobs, results, and errors.</span>
+            <span>Browse ticket jobs, results, and errors.</span>
             <InfoTip label="About this data">
               <p>
-                Rows come from <code>public.jobs</code>. Open a job to inspect{" "}
-                <code>result</code> JSON and error messages.
+                Rows come from <code>public.jobs</code>. Open a ticket job to
+                inspect <code>result</code> JSON and error messages.
               </p>
             </InfoTip>
           </>
@@ -562,7 +562,7 @@ export function JobsPanel() {
               {loading ? "…" : `${start}–${end}`}
             </span>{" "}
             of <span className="text-foreground font-medium">{loading ? "…" : total}</span>{" "}
-            jobs
+            ticket jobs
           </span>
           <span className="flex items-center gap-1">
             <Hash className="size-3" />
@@ -616,7 +616,7 @@ export function JobsPanel() {
                       colSpan={6}
                       className="h-48 text-center text-muted-foreground"
                     >
-                      No jobs match these filters.
+                      No ticket jobs match these filters.
                     </TableCell>
                   </TableRow>
                 ) : (

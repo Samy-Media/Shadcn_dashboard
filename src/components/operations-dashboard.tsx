@@ -16,8 +16,9 @@ import {
 } from "lucide-react";
 import {
   Area,
-  AreaChart,
+  ComposedChart,
   CartesianGrid,
+  Line,
   XAxis,
   YAxis,
 } from "recharts";
@@ -35,8 +36,6 @@ import {
 import {
   ChartConfig,
   ChartContainer,
-  ChartLegend,
-  ChartLegendContent,
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart";
@@ -60,6 +59,9 @@ type StatsPayload = {
     completed: number;
     failed: number;
     queued: number;
+    jobs: number;
+    messages: number;
+    atlas: number;
   }[];
 };
 
@@ -82,6 +84,18 @@ const jobsStatusChartConfig = {
     label: "Completed",
     color: STATUS_BAR_FILLS[2],
   },
+  jobs: {
+    label: "Ticket Jobs",
+    color: "hsl(210 90% 60%)",
+  },
+  messages: {
+    label: "Messages",
+    color: "hsl(262 83% 66%)",
+  },
+  atlas: {
+    label: "Atlas",
+    color: "hsl(188 78% 45%)",
+  },
 } satisfies ChartConfig;
 
 function ChartAreaShimmer() {
@@ -98,6 +112,48 @@ function ChartAreaShimmer() {
         </div>
       ))}
     </div>
+  );
+}
+
+function SourceLegendItem({
+  label,
+  color,
+  dashed = false,
+}: {
+  label: string;
+  color: string;
+  dashed?: boolean;
+}) {
+  return (
+    <div className="text-muted-foreground inline-flex items-center gap-2 text-xs">
+      <span
+        className={cn(
+          "inline-block h-0.5 w-5 rounded-full",
+          dashed && "bg-transparent"
+        )}
+        style={
+          dashed
+            ? {
+                backgroundImage: `repeating-linear-gradient(to right, ${color} 0 6px, transparent 6px 10px)`,
+              }
+            : { backgroundColor: color }
+        }
+      />
+      <span>{label}</span>
+    </div>
+  );
+}
+
+function LegendDot({
+  color,
+}: {
+  color: string;
+}) {
+  return (
+    <span
+      className="inline-block size-2.5 rounded-[4px]"
+      style={{ backgroundColor: color }}
+    />
   );
 }
 
@@ -188,6 +244,9 @@ export function OperationsDashboard() {
       queued: b.queued,
       failed: b.failed,
       completed: b.completed,
+      jobs: b.jobs,
+      messages: b.messages,
+      atlas: b.atlas,
     }));
   }, [stats]);
 
@@ -466,13 +525,14 @@ export function OperationsDashboard() {
                     <span className="font-medium text-foreground">
                       {s?.jobs.total}
                     </span>{" "}
-                    jobs in total. The chart is the last 7 days.
+                    jobs across core, messages, and Atlas. The chart is the last
+                    7 days.
                   </span>
                   <InfoTip label="How this chart is built">
                     <p>
-                      Each bar counts jobs <strong>created</strong> on that day,
-                      grouped by <strong>current</strong> status using the same rules
-                      as the rest of the dashboard (completed, failed, or queued).
+                      The filled areas show combined status totals across all job
+                      pipelines. The lines show per-day volume for core jobs,
+                      message jobs, and Atlas sync jobs on their own scale.
                     </p>
                     <p>
                       Optional detail: buckets align to calendar-day boundaries in
@@ -487,54 +547,126 @@ export function OperationsDashboard() {
             {loading || !s ? (
               <ChartAreaShimmer />
             ) : (
-              <ChartContainer
-                id="jobs-7d"
-                config={jobsStatusChartConfig}
-                className="h-[320px] w-full [&_.recharts-curve.recharts-tooltip-cursor]:stroke-border"
-              >
-                <AreaChart
-                  accessibilityLayer
-                  data={jobsTimeSeriesData}
-                  margin={{ left: 4, right: 8, top: 8, bottom: 0 }}
+              <div className="space-y-3">
+                <ChartContainer
+                  id="jobs-7d"
+                  config={jobsStatusChartConfig}
+                  className="h-[320px] w-full [&_.recharts-curve.recharts-tooltip-cursor]:stroke-border"
                 >
-                  <CartesianGrid vertical={false} strokeDasharray="3 3" />
-                  <XAxis
-                    dataKey="label"
-                    tickLine={false}
-                    axisLine={false}
-                    tickMargin={8}
-                    interval="preserveStartEnd"
-                    minTickGap={20}
-                  />
-                  <YAxis allowDecimals={false} width={36} />
-                  <ChartTooltip content={<ChartTooltipContent />} />
-                  <ChartLegend content={<ChartLegendContent />} />
-                  <Area
-                    type="monotone"
-                    dataKey="queued"
-                    stackId="jobs"
-                    stroke="var(--color-queued)"
-                    fill="var(--color-queued)"
-                    fillOpacity={0.55}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="failed"
-                    stackId="jobs"
-                    stroke="var(--color-failed)"
-                    fill="var(--color-failed)"
-                    fillOpacity={0.55}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="completed"
-                    stackId="jobs"
-                    stroke="var(--color-completed)"
-                    fill="var(--color-completed)"
-                    fillOpacity={0.55}
-                  />
-                </AreaChart>
-              </ChartContainer>
+                  <ComposedChart
+                    accessibilityLayer
+                    data={jobsTimeSeriesData}
+                    margin={{ left: 4, right: 8, top: 8, bottom: 0 }}
+                  >
+                    <CartesianGrid vertical={false} strokeDasharray="3 3" />
+                    <XAxis
+                      dataKey="label"
+                      tickLine={false}
+                      axisLine={false}
+                      tickMargin={8}
+                      interval="preserveStartEnd"
+                      minTickGap={20}
+                    />
+                    <YAxis yAxisId="status" allowDecimals={false} width={36} />
+                    <YAxis yAxisId="sources" hide allowDecimals={false} />
+                    <ChartTooltip content={<ChartTooltipContent />} />
+                    <Area
+                      yAxisId="status"
+                      type="monotone"
+                      dataKey="queued"
+                      stackId="jobs"
+                      stroke="var(--color-queued)"
+                      fill="var(--color-queued)"
+                      fillOpacity={0.55}
+                    />
+                    <Area
+                      yAxisId="status"
+                      type="monotone"
+                      dataKey="failed"
+                      stackId="jobs"
+                      stroke="var(--color-failed)"
+                      fill="var(--color-failed)"
+                      fillOpacity={0.55}
+                    />
+                    <Area
+                      yAxisId="status"
+                      type="monotone"
+                      dataKey="completed"
+                      stackId="jobs"
+                      stroke="var(--color-completed)"
+                      fill="var(--color-completed)"
+                      fillOpacity={0.55}
+                    />
+                    <Line
+                      yAxisId="sources"
+                      type="monotone"
+                      dataKey="jobs"
+                      stroke="var(--color-jobs)"
+                      strokeWidth={2.5}
+                      dot={false}
+                      activeDot={{ r: 4 }}
+                    />
+                    <Line
+                      yAxisId="sources"
+                      type="monotone"
+                      dataKey="messages"
+                      stroke="var(--color-messages)"
+                      strokeWidth={2.5}
+                      strokeDasharray="5 5"
+                      dot={false}
+                      activeDot={{ r: 4 }}
+                    />
+                    <Line
+                      yAxisId="sources"
+                      type="monotone"
+                      dataKey="atlas"
+                      stroke="var(--color-atlas)"
+                      strokeWidth={2.5}
+                      strokeDasharray="3 4"
+                      dot={false}
+                      activeDot={{ r: 4 }}
+                    />
+                  </ComposedChart>
+                </ChartContainer>
+                <div className="flex flex-wrap items-center gap-x-6 gap-y-3 px-1 pt-1">
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                    <span className="text-foreground text-xs font-medium">
+                      Status
+                    </span>
+                    <div className="text-muted-foreground inline-flex items-center gap-2 text-xs">
+                      <LegendDot color="hsl(38 92% 45%)" />
+                      <span>Queued</span>
+                    </div>
+                    <div className="text-muted-foreground inline-flex items-center gap-2 text-xs">
+                      <LegendDot color="hsl(0 72% 51%)" />
+                      <span>Failed</span>
+                    </div>
+                    <div className="text-muted-foreground inline-flex items-center gap-2 text-xs">
+                      <LegendDot color="hsl(142 71% 40%)" />
+                      <span>Completed</span>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                    <span className="text-foreground text-xs font-medium">
+                      Sources
+                    </span>
+                    <SourceLegendItem
+                      label="Ticket Jobs"
+                      color="hsl(210 90% 60%)"
+                    />
+                    <SourceLegendItem
+                      label="Messages"
+                      color="hsl(262 83% 66%)"
+                      dashed
+                    />
+                    <SourceLegendItem
+                      label="Atlas"
+                      color="hsl(188 78% 45%)"
+                      dashed
+                    />
+                  </div>
+                </div>
+              </div>
             )}
           </CardContent>
         </Card>

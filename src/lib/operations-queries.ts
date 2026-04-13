@@ -52,6 +52,9 @@ export type JobStatusBucket7d = {
   completed: number;
   failed: number;
   queued: number;
+  jobs: number;
+  messages: number;
+  atlas: number;
 };
 
 export type DashboardStats = {
@@ -78,8 +81,24 @@ export async function getJobsStatusBucketsLast7Days(): Promise<
     completed: string;
     failed: string;
     queued: string;
+    jobs: string;
+    messages: string;
+    atlas: string;
   }>(
-    `SELECT
+    `WITH all_jobs AS (
+       SELECT created_at, status, 'jobs'::text AS source
+       FROM public.jobs
+       WHERE created_at IS NOT NULL
+       UNION ALL
+       SELECT created_at, status, 'messages'::text AS source
+       FROM public.slack_message_jobs
+       WHERE created_at IS NOT NULL
+       UNION ALL
+       SELECT created_at, status, 'atlas'::text AS source
+       FROM public.slack_atlas_sync_jobs
+       WHERE created_at IS NOT NULL
+     )
+     SELECT
        date_trunc('day', created_at) AS bucket_at,
        COUNT(*) FILTER (
          WHERE LOWER(TRIM(status)) IN (
@@ -96,17 +115,26 @@ export async function getJobsStatusBucketsLast7Days(): Promise<
            'completed', 'success', 'succeeded', 'complete',
            'failed', 'failure', 'error', 'errored'
          )
-       )::text AS queued
-     FROM public.jobs
+       )::text AS queued,
+       COUNT(*) FILTER (WHERE source = 'jobs')::text AS jobs,
+       COUNT(*) FILTER (WHERE source = 'messages')::text AS messages,
+       COUNT(*) FILTER (WHERE source = 'atlas')::text AS atlas
+     FROM all_jobs
      WHERE created_at >= date_trunc('day', NOW()) - INTERVAL '6 days'
-       AND created_at IS NOT NULL
      GROUP BY 1
      ORDER BY 1`
   );
 
   const rowMap = new Map<
     string,
-    { completed: number; failed: number; queued: number }
+    {
+      completed: number;
+      failed: number;
+      queued: number;
+      jobs: number;
+      messages: number;
+      atlas: number;
+    }
   >();
 
   for (const r of rows) {
@@ -120,6 +148,9 @@ export async function getJobsStatusBucketsLast7Days(): Promise<
       completed: Number(r.completed ?? 0),
       failed: Number(r.failed ?? 0),
       queued: Number(r.queued ?? 0),
+      jobs: Number(r.jobs ?? 0),
+      messages: Number(r.messages ?? 0),
+      atlas: Number(r.atlas ?? 0),
     });
   }
 
@@ -141,6 +172,9 @@ export async function getJobsStatusBucketsLast7Days(): Promise<
       completed: m?.completed ?? 0,
       failed: m?.failed ?? 0,
       queued: m?.queued ?? 0,
+      jobs: m?.jobs ?? 0,
+      messages: m?.messages ?? 0,
+      atlas: m?.atlas ?? 0,
     });
   }
 
@@ -1130,7 +1164,14 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     failed: string;
     queued: string;
   }>(
-    `SELECT
+    `WITH all_jobs AS (
+       SELECT status FROM public.jobs
+       UNION ALL
+       SELECT status FROM public.slack_message_jobs
+       UNION ALL
+       SELECT status FROM public.slack_atlas_sync_jobs
+     )
+     SELECT
        u.c AS users_c,
        i.c AS installs_c,
        j.total,
@@ -1158,7 +1199,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
                   'failed', 'failure', 'error', 'errored'
                 )
               )::text AS queued
-            FROM public.jobs
+            FROM all_jobs
           ) j`
   );
 
