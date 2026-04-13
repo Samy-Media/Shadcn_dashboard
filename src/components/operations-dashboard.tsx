@@ -255,7 +255,7 @@ export function OperationsDashboard() {
       <section className="space-y-6">
         <PageHeading
           icon={PieChart}
-          title="Operations overview"
+          title="Overview"
           description={
             <>
               <span>
@@ -288,7 +288,7 @@ export function OperationsDashboard() {
     <section className="space-y-6">
       <PageHeading
         icon={PieChart}
-        title="Operations overview"
+        title="Overview"
         description={
           <>
             <span>
