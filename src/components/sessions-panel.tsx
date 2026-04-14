@@ -449,18 +449,18 @@ export function SessionsPanel() {
                       <TableRow key={row.key} className="border-muted-foreground/10 hover:bg-muted/40">
                         <TableCell className="max-w-0 align-middle">
                           <code
-                            className="block truncate rounded bg-muted px-1.5 py-0.5 font-mono text-xs"
+                            className="inline-flex w-fit max-w-full items-center rounded-md bg-muted px-2 py-0.5 font-mono text-xs"
                             title={row.teamId}
                           >
-                            {row.teamId}
+                            <span className="truncate">{row.teamId}</span>
                           </code>
                         </TableCell>
                         <TableCell className="max-w-0 align-middle">
                           <code
-                            className="block truncate rounded bg-muted px-1.5 py-0.5 font-mono text-xs"
+                            className="inline-flex w-fit max-w-full items-center rounded-md bg-muted px-2 py-0.5 font-mono text-xs"
                             title={row.userId}
                           >
-                            {row.userId}
+                            <span className="truncate">{row.userId}</span>
                           </code>
                         </TableCell>
                         <TableCell className="max-w-0 align-middle">
@@ -479,10 +479,10 @@ export function SessionsPanel() {
                         </TableCell>
                         <TableCell className="max-w-0 align-middle">
                           <code
-                            className="block truncate rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] leading-snug"
+                            className="inline-flex w-fit max-w-full items-center rounded-md bg-muted px-2 py-0.5 font-mono text-[11px] leading-snug"
                             title={row.key}
                           >
-                            {row.key}
+                            <span className="truncate">{row.key}</span>
                           </code>
                         </TableCell>
                         <TableCell className="max-w-0 text-right align-middle">

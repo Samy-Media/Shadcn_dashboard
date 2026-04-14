@@ -225,10 +225,10 @@ export function InstallationsPanel() {
                         </TableCell>
                         <TableCell className="max-w-0 align-middle">
                           <code
-                            className="block truncate rounded-md bg-muted px-2 py-0.5 font-mono text-xs"
+                            className="inline-flex w-fit max-w-full items-center rounded-md bg-muted px-2 py-0.5 font-mono text-xs"
                             title={r.app_id ?? undefined}
                           >
-                            {r.app_id?.trim() || "—"}
+                            <span className="truncate">{r.app_id?.trim() || "—"}</span>
                           </code>
                         </TableCell>
                         <TableCell className="max-w-0 align-middle">
@@ -239,10 +239,10 @@ export function InstallationsPanel() {
                               </span>
                               {r.enterprise_id ? (
                                 <code
-                                  className="text-muted-foreground block truncate font-mono text-[11px]"
+                                  className="text-muted-foreground inline-flex w-fit max-w-full items-center rounded-md bg-muted px-2 py-0.5 font-mono text-[11px]"
                                   title={r.enterprise_id}
                                 >
-                                  {r.enterprise_id}
+                                  <span className="truncate">{r.enterprise_id}</span>
                                 </code>
                               ) : null}
                             </div>
@@ -253,7 +253,7 @@ export function InstallationsPanel() {
                         <TableCell className="max-w-0 align-middle">
                           {r.user_id ? (
                             <span
-                              className="flex min-w-0 items-center gap-1 font-mono text-[12px]"
+                              className="inline-flex w-fit max-w-full items-center gap-1 rounded-md bg-muted px-2 py-0.5 font-mono text-[12px]"
                               title={r.user_id}
                             >
                               <UserCircle2 className="text-muted-foreground size-3 shrink-0" />
@@ -266,7 +266,7 @@ export function InstallationsPanel() {
                         <TableCell className="max-w-0 align-middle">
                           {r.bot_id ? (
                             <span
-                              className="flex min-w-0 items-center gap-1 font-mono text-[12px]"
+                              className="inline-flex w-fit max-w-full items-center gap-1 rounded-md bg-muted px-2 py-0.5 font-mono text-[12px]"
                               title={r.bot_id}
                             >
                               <Bot className="text-muted-foreground size-3 shrink-0" />

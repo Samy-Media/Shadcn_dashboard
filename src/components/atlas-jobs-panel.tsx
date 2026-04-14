@@ -470,10 +470,10 @@ export function AtlasJobsPanel() {
                     >
                       <TableCell className="max-w-0 align-middle">
                         <code
-                          className="block truncate rounded-md bg-muted px-1.5 py-0.5 font-mono text-xs"
+                          className="inline-flex w-fit max-w-full items-center rounded-md bg-muted px-2 py-0.5 font-mono text-xs"
                           title={r.slack_user_id}
                         >
-                          {r.slack_user_id}
+                          <span className="truncate">{r.slack_user_id}</span>
                         </code>
                       </TableCell>
                       <TableCell className="max-w-0 align-middle">

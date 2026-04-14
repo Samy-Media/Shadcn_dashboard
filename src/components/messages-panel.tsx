@@ -544,10 +544,10 @@ export function MessagesPanel() {
                     >
                       <TableCell className="max-w-0 align-middle">
                         <code
-                          className="block truncate rounded-md bg-muted px-1.5 py-0.5 font-mono text-xs"
+                          className="inline-flex w-fit max-w-full items-center rounded-md bg-muted px-2 py-0.5 font-mono text-xs"
                           title={r.channel}
                         >
-                          {r.channel}
+                          <span className="truncate">{r.channel}</span>
                         </code>
                       </TableCell>
                       <TableCell className="max-w-0 align-middle">
@@ -568,8 +568,8 @@ export function MessagesPanel() {
                       </TableCell>
                       <TableCell className="max-w-0 align-middle">
                         {r.bull_job_id ? (
-                          <code className="block truncate font-mono text-[11px]">
-                            {r.bull_job_id}
+                          <code className="inline-flex w-fit max-w-full items-center rounded-md bg-muted px-2 py-0.5 font-mono text-[11px]">
+                            <span className="truncate">{r.bull_job_id}</span>
                           </code>
                         ) : (
                           <span className="text-muted-foreground">—</span>

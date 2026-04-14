@@ -571,8 +571,8 @@ export function ProductTable() {
                         </Avatar>
                       </TableCell>
                       <TableCell>
-                        <code className="rounded-md bg-muted/80 px-2 py-0.5 font-mono text-[13px]">
-                          {u.slack_user_id}
+                        <code className="inline-flex w-fit max-w-full items-center rounded-md bg-muted/80 px-2 py-0.5 font-mono text-[13px]">
+                          <span className="truncate">{u.slack_user_id}</span>
                         </code>
                       </TableCell>
                       <TableCell className="max-w-[280px]">
